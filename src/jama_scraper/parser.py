@@ -614,7 +614,7 @@ class HTMLParser:
         return f"![{description}]({src})"
 
     def _inline_to_markdown(self, tag: Tag) -> str:
-        """Convert inline content to markdown."""
+        """Convert inline content to markdown, preserving nested links."""
         parts = []
 
         for child in tag.children:
@@ -628,19 +628,32 @@ class HTMLParser:
                 if child.name in TAGS_TO_REMOVE:
                     continue
                 if child.name in {"strong", "b"}:
-                    parts.append(f"**{child.get_text()}**")
+                    # Recursively process to preserve nested links
+                    inner = self._inline_to_markdown(child)
+                    parts.append(f"**{inner}**")
                 elif child.name in {"em", "i"}:
-                    parts.append(f"*{child.get_text()}*")
+                    inner = self._inline_to_markdown(child)
+                    parts.append(f"*{inner}*")
+                elif child.name == "u":
+                    # Underline - just process contents (no markdown equivalent)
+                    parts.append(self._inline_to_markdown(child))
                 elif child.name == "code":
                     parts.append(f"`{child.get_text()}`")
                 elif child.name == "a":
-                    text = child.get_text()
+                    # Recursively process link text to handle nested formatting
+                    text = self._inline_to_markdown(child)
                     href = child.get("href", "")
-                    parts.append(f"[{text}]({href})")
+                    if href:
+                        parts.append(f"[{text}]({href})")
+                    else:
+                        parts.append(text)
                 elif child.name == "br":
                     parts.append("\n")
                 elif child.name == "img":
                     parts.append(self._img_to_markdown(child))
+                elif child.name == "span":
+                    # Process span contents
+                    parts.append(self._inline_to_markdown(child))
                 else:
                     parts.append(child.get_text())
 
