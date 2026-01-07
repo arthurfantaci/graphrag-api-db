@@ -258,7 +258,7 @@ class HTMLParser:
         """Find the main content container.
 
         Targets the flex_cell_inner div which contains article content,
-        excluding the final section (typically promotional CTA content).
+        selectively excluding final sections that contain CTA content.
         """
         # Jama's site uses Enfold/Avia theme with flex_cell layout
         # The second flex_cell_inner contains the main article content
@@ -266,9 +266,9 @@ class HTMLParser:
         if len(flex_cell_inners) >= MIN_CONTENT_ELEMENTS:
             content_elem = flex_cell_inners[1]
 
-            # Remove the final section (typically contains CTA/promotional content)
+            # Only remove final section if it contains CTA/promotional content
             sections = content_elem.find_all("section", recursive=False)
-            if sections:
+            if sections and self._is_cta_section(sections[-1]):
                 sections[-1].decompose()
 
             return content_elem
@@ -296,6 +296,39 @@ class HTMLParser:
 
         # Fall back to body
         return soup.find("body")
+
+    def _is_cta_section(self, section: Tag) -> bool:
+        """Check if a section contains CTA/promotional content.
+
+        Args:
+            section: BeautifulSoup Tag to check.
+
+        Returns:
+            True if the section appears to contain CTA content.
+        """
+        # Check for CTA button classes
+        if section.find(class_=re.compile(r"avia-button", re.IGNORECASE)):
+            return True
+
+        # Check for CTA link patterns
+        if section.find("a", href=PROMO_LINK_PATTERNS):
+            return True
+
+        # Check text content for CTA patterns
+        text = section.get_text(strip=True)
+        if PROMO_TEXT_PATTERNS.search(text):
+            return True
+
+        # Check for "Ready to Find Out More" or similar headings
+        for heading in section.find_all(["h2", "h3", "h4"]):
+            heading_text = heading.get_text(strip=True).lower()
+            if any(
+                pattern in heading_text
+                for pattern in ["find out more", "book a demo", "get started"]
+            ):
+                return True
+
+        return False
 
     def _clean_html(self, elem: Tag) -> None:
         """Remove non-content elements from HTML in place.
