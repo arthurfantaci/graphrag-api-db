@@ -13,6 +13,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "lxml>=5.0.0",
     "pydantic>=2.5.0",
+    "python-dotenv>=1.0.0",
     "rich>=13.7.0",
     "tenacity>=8.2.0",
 ]
@@ -34,6 +35,16 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "ruff>=0.14.0",
     "ty>=0.0.8",
+]
+browser = [
+    "playwright>=1.40.0",
+]
+enrichment = [
+    "langextract[openai]>=1.0.0",
+]
+embedding = [
+    "openai>=1.0.0",
+    "tiktoken>=0.5.0",
 ]
 
 # =============================================================================
@@ -136,10 +147,39 @@ ignore = [
 "**/parser.py" = ["PLR0911", "PLR0912"]
 
 # Scraper's try/return pattern is more readable than try/else
-"**/scraper.py" = ["TRY300"]
+# save_markdown has readable sequential logic for building markdown output
+# run_scraper has many optional parameters for flexibility
+"**/scraper.py" = ["TRY300", "PLR0912", "PLR0913", "PLC0415"]
+
+# Fetcher uses try/return pattern and lazy imports for optional dependencies
+"**/fetcher.py" = ["TRY300", "PLC0415"]
+
+# Extraction schemas use lazy imports for optional langextract dependency
+"**/extraction_schemas.py" = ["PLC0415"]
+
+# Extractor uses lazy imports for optional langextract dependency
+"**/extractor.py" = ["PLC0415"]
+
+# CLI has many branches and statements due to argument parsing
+"**/cli.py" = ["PLR0912", "PLR0915"]
+
+# Chunker and embedder use lazy imports for optional dependencies
+"**/chunker.py" = ["PLC0415"]
+"**/embedder.py" = ["PLC0415", "TC001"]
+"**/text_utils.py" = ["PLC0415", "ANN401"]
+
+# Export uses Path at runtime, not just for type hints
+"**/chunk_export.py" = ["TC003"]
+
+# Config files use **kwargs to absorb extra CLI arguments
+"**/chunking_config.py" = ["ANN401"]
+"**/embedding_config.py" = ["ANN401"]
 
 # Config contains long article titles/URLs that shouldn't be wrapped
 "**/config.py" = ["E501"]
+
+# Package init uses categorized __all__ for readability over alphabetical sorting
+"**/__init__.py" = ["RUF022"]
 
 [tool.ruff.lint.pydocstyle]
 # Use Google-style docstrings

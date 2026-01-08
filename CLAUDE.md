@@ -25,6 +25,18 @@ jama-scrape                           # Default: outputs JSON + JSONL
 jama-scrape -o ./data                 # Custom output directory
 jama-scrape -f json -f jsonl -f markdown  # Multiple formats
 jama-scrape --include-html            # Include raw HTML in output
+jama-scrape --browser                 # Use Playwright for JS-rendered content
+```
+
+### Browser Mode (Playwright)
+For JavaScript-rendered content (e.g., YouTube embeds):
+```bash
+# Install browser dependencies
+uv sync --group browser
+playwright install chromium
+
+# Run with browser mode (slower but captures dynamic content)
+jama-scrape --browser
 ```
 
 ### Development
@@ -62,25 +74,70 @@ The `.vscode/` directory contains:
 
 ## Architecture
 
-The scraper follows a pipeline architecture:
+The scraper follows a pipeline architecture with pluggable fetching strategies:
 
-1. **config.py** - Contains all URL configurations, chapter/article mappings, and rate limiting settings. `ChapterConfig` and `ArticleConfig` dataclasses define the guide structure. Some chapters have incomplete article lists and are discovered dynamically by scraping overview pages.
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     JamaGuideScraper                        │
+│  - Orchestrates scraping pipeline                           │
+│  - Uses parser for HTML → Markdown conversion               │
+│  - Delegates fetching to Fetcher abstraction                │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Fetcher (Protocol)                        │
+│  async def fetch(url: str) -> str | None                    │
+│  async context manager support                              │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+            ┌─────────────┴─────────────┐
+            ▼                           ▼
+┌───────────────────────┐   ┌───────────────────────┐
+│     HttpxFetcher      │   │   PlaywrightFetcher   │
+│  - Fast (~50ms/page)  │   │  - Slow (~2s/page)    │
+│  - Static HTML only   │   │  - Full JS rendering  │
+│  - Default            │   │  - --browser flag     │
+└───────────────────────┘   └───────────────────────┘
+```
 
-2. **scraper.py** - `JamaGuideScraper` is the main class. Uses `httpx.AsyncClient` with semaphore-based concurrency control and tenacity retry logic. The scraping flow:
+### Core Modules
+
+1. **config.py** - URL configurations, chapter/article mappings, rate limiting settings. `ChapterConfig` and `ArticleConfig` dataclasses define the guide structure. Some chapters have incomplete article lists and are discovered dynamically.
+
+2. **fetcher.py** - Protocol-based fetcher abstraction (PEP 544 structural subtyping):
+   - `Fetcher` - Protocol defining the interface with async context manager support
+   - `FetcherConfig` - Frozen dataclass for configuration (rate limit, concurrency, timeout)
+   - `HttpxFetcher` - Fast HTTP client for static HTML (default)
+   - `PlaywrightFetcher` - Headless browser for JS-rendered content (lazy init)
+   - `create_fetcher()` - Factory function for instantiation
+
+3. **scraper.py** - `JamaGuideScraper` orchestrates the pipeline:
    - `scrape_all()` → `_discover_all_articles()` → `_scrape_all_chapters()` → `_scrape_glossary()`
-   - Rate limiting via `_fetch_with_rate_limit()` with configurable delay between requests
+   - Uses fetcher abstraction via dependency injection
 
-3. **parser.py** - `HTMLParser` converts HTML to Markdown and extracts metadata. Key methods:
-   - `parse_article()` - Extracts title, markdown content, sections, cross-references, key concepts
-   - `parse_glossary()` - Handles multiple glossary HTML patterns (dl/dt/dd, headings, strong tags)
+4. **parser.py** - `HTMLParser` converts HTML to Markdown and extracts metadata:
+   - `parse_article()` - Extracts title, markdown, sections, cross-references, images, videos
+   - `parse_glossary()` - Handles multiple glossary HTML patterns
    - `discover_articles()` - Finds article links from chapter overview pages
 
-4. **models.py** - Pydantic models with computed fields for word/character counts. The `RequirementsManagementGuide` root model has `to_jsonl_articles()` for RAG-friendly export.
+5. **models.py** - Pydantic models with computed fields for word/character counts. Includes `VideoReference` for embedded media tracking.
+
+6. **exceptions.py** - Custom exception hierarchy:
+   - `ScraperError` - Base exception
+   - `FetchError` - Content fetching failures
+   - `PlaywrightNotAvailableError` - Package not installed
+   - `BrowserNotInstalledError` - Browser binaries not installed
 
 ## Key Design Decisions
 
+- **Protocol Pattern (PEP 544)** - Structural subtyping for fetcher abstraction enables testing and extensibility
+- **Strategy Pattern** - Swappable fetching strategies (httpx vs Playwright) via `create_fetcher()` factory
+- **Dependency Injection** - Scraper receives fetcher, doesn't create it internally
+- **Lazy Initialization** - Playwright browser only started on first request
+- **Frozen Dataclass** - `FetcherConfig` is immutable and hashable
 - Async with semaphore concurrency (default 3 parallel requests) for respectful scraping
 - Exponential backoff retry on HTTP errors (max 3 retries)
-- Articles auto-discovered from chapter overviews when not pre-configured in `config.py`
-- Cross-references tracked with internal/external classification for knowledge graph use
+- Articles auto-discovered from chapter overviews when not pre-configured
+- Cross-references tracked with internal/external classification for knowledge graphs
 - JSONL format provides self-contained records per article for easy RAG chunking

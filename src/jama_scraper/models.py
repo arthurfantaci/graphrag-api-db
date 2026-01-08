@@ -75,6 +75,43 @@ class VideoReference(BaseModel):
     )
 
 
+class WebinarReference(BaseModel):
+    """A reference to a webinar resource linked in the article.
+
+    Captures webinars from various patterns:
+    - Text links to webinar URLs
+    - Image thumbnails linking to webinars
+    - Featured webinar sections with "In This Webinar" descriptions
+    """
+
+    url: str = Field(description="Webinar URL")
+    title: str = Field(description="Webinar title or link text")
+    description: str | None = Field(
+        default=None,
+        description="Webinar description from 'In This Webinar' section if available",
+    )
+    thumbnail_url: str | None = Field(
+        default=None, description="Thumbnail image URL if linked from an image"
+    )
+    context: str | None = Field(
+        default=None, description="Surrounding heading context for the webinar"
+    )
+
+
+class RelatedArticle(BaseModel):
+    """A related article callout within the content.
+
+    These are explicitly marked with "RELATED ARTICLE:" in av_promobox elements.
+    """
+
+    url: str = Field(description="URL of the related article")
+    title: str = Field(description="Title of the related article")
+    source_type: str = Field(
+        default="internal",
+        description="Source type: 'internal' (guide), 'blog', 'resource', 'external'",
+    )
+
+
 class Article(BaseModel):
     """An individual article/page within a chapter."""
 
@@ -115,7 +152,15 @@ class Article(BaseModel):
     )
     videos: list[VideoReference] = Field(
         default_factory=list,
-        description="Videos and webinars embedded in this article",
+        description="Videos embedded in this article (e.g., YouTube)",
+    )
+    webinars: list[WebinarReference] = Field(
+        default_factory=list,
+        description="Webinar resources linked in this article",
+    )
+    related_articles: list[RelatedArticle] = Field(
+        default_factory=list,
+        description="Explicitly marked related article callouts",
     )
 
     # Timestamps
@@ -166,6 +211,9 @@ class GlossaryTerm(BaseModel):
     """A single glossary term and definition."""
 
     term: str = Field(description="The term being defined")
+    acronym: str | None = Field(
+        default=None, description="Acronym if applicable (e.g., 'AoA')"
+    )
     definition: str = Field(description="The definition text")
     related_terms: list[str] = Field(
         default_factory=list, description="Related glossary terms"

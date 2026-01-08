@@ -47,3 +47,13 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+
+# Enrichment cache (checkpoint files)
+.enrichment_cache/
+output/.enrichment_cache/
+test_output/

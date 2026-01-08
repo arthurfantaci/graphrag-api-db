@@ -1,20 +1,18 @@
 """Async web scraper for the Jama Requirements Management Guide.
 
 Features:
-- Async HTTP requests with httpx
+- Pluggable fetcher abstraction (httpx or Playwright)
 - Rate limiting to be respectful to the server
 - Retry logic with exponential backoff
 - Progress tracking with Rich
 """
 
-import asyncio
 from dataclasses import replace
 from datetime import UTC, datetime
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import httpx
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -23,23 +21,17 @@ from rich.progress import (
     TaskProgressColumn,
     TextColumn,
 )
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from .config import (
     CHAPTERS,
     GLOSSARY_URL,
     MAX_CONCURRENT_REQUESTS,
-    MAX_RETRIES,
     RATE_LIMIT_DELAY_SECONDS,
     REQUEST_TIMEOUT_SECONDS,
     ArticleConfig,
     ChapterConfig,
 )
+from .fetcher import Fetcher, FetcherConfig, create_fetcher
 from .models import (
     Article,
     Chapter,
@@ -54,8 +46,8 @@ from .parser import HTMLParser
 if TYPE_CHECKING:
     from rich.progress import TaskID
 
-# HTTP status codes
-HTTP_NOT_FOUND = 404
+    from .chunk_models import ChunkedGuide, EmbeddedGuideChunks
+    from .graph_models import EnrichedGuide
 
 console = Console()
 
@@ -63,11 +55,19 @@ console = Console()
 class JamaGuideScraper:
     """Scraper for the Jama Requirements Management Guide.
 
+    Supports two fetching modes:
+    - Default (httpx): Fast, lightweight, for static HTML content
+    - Browser (Playwright): Slower but renders JavaScript for dynamic content
+
     Usage:
         scraper = JamaGuideScraper()
         guide = await scraper.scrape_all()
         scraper.save_json(guide, Path("output/guide.json"))
         scraper.save_jsonl(guide, Path("output/guide.jsonl"))
+
+        # For JavaScript-rendered content (e.g., YouTube embeds):
+        scraper = JamaGuideScraper(use_browser=True)
+        guide = await scraper.scrape_all()
     """
 
     def __init__(
@@ -76,39 +76,47 @@ class JamaGuideScraper:
         max_concurrent: int = MAX_CONCURRENT_REQUESTS,
         timeout: float = REQUEST_TIMEOUT_SECONDS,
         include_raw_html: bool = False,
+        use_browser: bool = False,
     ) -> None:
-        """Initialize the scraper with rate limiting and concurrency settings."""
-        self.rate_limit_delay = rate_limit_delay
-        self.max_concurrent = max_concurrent
-        self.timeout = timeout
+        """Initialize the scraper with rate limiting and concurrency settings.
+
+        Args:
+            rate_limit_delay: Minimum seconds between requests.
+            max_concurrent: Maximum parallel requests.
+            timeout: Request timeout in seconds.
+            include_raw_html: Whether to include raw HTML in output.
+            use_browser: If True, use Playwright for JS rendering.
+        """
+        self._config = FetcherConfig(
+            rate_limit_delay=rate_limit_delay,
+            max_concurrent=max_concurrent,
+            timeout=timeout,
+        )
+        self._use_browser = use_browser
         self.include_raw_html = include_raw_html
         self.parser = HTMLParser()
-        self._semaphore = asyncio.Semaphore(max_concurrent)
-        self._last_request_time = 0.0
 
     async def scrape_all(self) -> RequirementsManagementGuide:
         """Scrape the entire guide including all chapters and glossary."""
         console.print(
             "[bold blue]Starting Jama Requirements Management Guide Scraper[/]"
         )
+        mode = "browser (Playwright)" if self._use_browser else "httpx"
         console.print(
-            f"Rate limit: {self.rate_limit_delay}s delay, "
-            f"{self.max_concurrent} concurrent requests"
+            f"Rate limit: {self._config.rate_limit_delay}s delay, "
+            f"{self._config.max_concurrent} concurrent requests"
         )
+        console.print(f"Fetcher mode: {mode}")
 
-        async with httpx.AsyncClient(
-            timeout=self.timeout,
-            follow_redirects=True,
-            headers={"User-Agent": "JamaGuideScraper/0.1.0 (Educational/Research)"},
-        ) as client:
+        async with create_fetcher(self._use_browser, self._config) as fetcher:
             # First, discover any missing articles from chapter overviews
-            chapters_config = await self._discover_all_articles(client)
+            chapters_config = await self._discover_all_articles(fetcher)
 
             # Scrape all chapters
-            chapters = await self._scrape_all_chapters(client, chapters_config)
+            chapters = await self._scrape_all_chapters(fetcher, chapters_config)
 
             # Scrape glossary
-            glossary = await self._scrape_glossary(client)
+            glossary = await self._scrape_glossary(fetcher)
 
             guide = RequirementsManagementGuide(
                 metadata=GuideMetadata(scraped_at=datetime.now(UTC)),
@@ -125,10 +133,15 @@ class JamaGuideScraper:
 
             return guide
 
-    async def _discover_all_articles(
-        self, client: httpx.AsyncClient
-    ) -> list[ChapterConfig]:
-        """Discover articles by scraping chapter overview pages."""
+    async def _discover_all_articles(self, fetcher: Fetcher) -> list[ChapterConfig]:
+        """Discover articles by scraping chapter overview pages.
+
+        Args:
+            fetcher: The fetcher to use for HTTP requests.
+
+        Returns:
+            List of chapter configurations with discovered articles.
+        """
         console.print("\n[yellow]Discovering articles from chapter overviews...[/]")
 
         updated_chapters = []
@@ -146,9 +159,7 @@ class JamaGuideScraper:
                 # If chapter only has overview, try to discover more
                 current_chapter = chapter_config
                 if len(chapter_config.articles) <= 1:
-                    html = await self._fetch_with_rate_limit(
-                        client, chapter_config.overview_url
-                    )
+                    html = await fetcher.fetch(chapter_config.overview_url)
                     if html:
                         discovered = self.parser.discover_articles(
                             html, chapter_config.slug
@@ -175,10 +186,18 @@ class JamaGuideScraper:
 
     async def _scrape_all_chapters(
         self,
-        client: httpx.AsyncClient,
+        fetcher: Fetcher,
         chapters_config: list[ChapterConfig],
     ) -> list[Chapter]:
-        """Scrape all chapters."""
+        """Scrape all chapters.
+
+        Args:
+            fetcher: The fetcher to use for HTTP requests.
+            chapters_config: List of chapter configurations.
+
+        Returns:
+            List of scraped Chapter objects.
+        """
         console.print("\n[yellow]Scraping chapters...[/]")
 
         chapters = []
@@ -195,7 +214,7 @@ class JamaGuideScraper:
 
             for chapter_config in chapters_config:
                 chapter = await self._scrape_chapter(
-                    client, chapter_config, progress, task
+                    fetcher, chapter_config, progress, task
                 )
                 chapters.append(chapter)
 
@@ -203,18 +222,28 @@ class JamaGuideScraper:
 
     async def _scrape_chapter(
         self,
-        client: httpx.AsyncClient,
+        fetcher: Fetcher,
         config: ChapterConfig,
         progress: Progress,
         task: "TaskID",
     ) -> Chapter:
-        """Scrape a single chapter."""
+        """Scrape a single chapter.
+
+        Args:
+            fetcher: The fetcher to use for HTTP requests.
+            config: Chapter configuration.
+            progress: Rich progress bar.
+            task: Progress task ID.
+
+        Returns:
+            Scraped Chapter object.
+        """
         articles = []
 
         for article_config in config.articles:
             url = config.get_article_url(article_config)
 
-            html = await self._fetch_with_rate_limit(client, url)
+            html = await fetcher.fetch(url)
 
             if html:
                 parsed = self.parser.parse_article(html, url)
@@ -238,6 +267,9 @@ class JamaGuideScraper:
                     key_concepts=parsed["key_concepts"],
                     cross_references=parsed["cross_references"],
                     images=parsed["images"],
+                    videos=parsed["videos"],
+                    webinars=parsed["webinars"],
+                    related_articles=parsed["related_articles"],
                 )
                 articles.append(article)
             else:
@@ -252,11 +284,18 @@ class JamaGuideScraper:
             articles=articles,
         )
 
-    async def _scrape_glossary(self, client: httpx.AsyncClient) -> Glossary | None:
-        """Scrape the glossary page."""
+    async def _scrape_glossary(self, fetcher: Fetcher) -> Glossary | None:
+        """Scrape the glossary page.
+
+        Args:
+            fetcher: The fetcher to use for HTTP requests.
+
+        Returns:
+            Glossary object or None if fetch failed.
+        """
         console.print("\n[yellow]Scraping glossary...[/]")
 
-        html = await self._fetch_with_rate_limit(client, GLOSSARY_URL)
+        html = await fetcher.fetch(GLOSSARY_URL)
 
         if not html:
             console.print("[red]Failed to fetch glossary[/]")
@@ -267,6 +306,7 @@ class JamaGuideScraper:
         terms = [
             GlossaryTerm(
                 term=t["term"],
+                acronym=t.get("acronym"),
                 definition=t["definition"],
             )
             for t in terms_data
@@ -278,36 +318,6 @@ class JamaGuideScraper:
             url=GLOSSARY_URL,
             terms=terms,
         )
-
-    @retry(
-        stop=stop_after_attempt(MAX_RETRIES),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type((httpx.HTTPError, httpx.TimeoutException)),
-    )
-    async def _fetch_with_rate_limit(
-        self, client: httpx.AsyncClient, url: str
-    ) -> str | None:
-        """Fetch a URL with rate limiting and retry logic."""
-        async with self._semaphore:
-            # Rate limiting
-            now = asyncio.get_event_loop().time()
-            elapsed = now - self._last_request_time
-            if elapsed < self.rate_limit_delay:
-                await asyncio.sleep(self.rate_limit_delay - elapsed)
-
-            try:
-                response = await client.get(url)
-                response.raise_for_status()
-                self._last_request_time = asyncio.get_event_loop().time()
-                return response.text
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == HTTP_NOT_FOUND:
-                    console.print(f"[yellow]404 Not Found: {url}[/]")
-                    return None
-                raise
-            except Exception as e:
-                console.print(f"[red]Error fetching {url}: {e}[/]")
-                raise
 
     def save_json(self, guide: RequirementsManagementGuide, path: Path) -> None:
         """Save the guide as a single JSON file."""
@@ -378,6 +388,34 @@ class JamaGuideScraper:
                 lines.append(f"*Source: {article.url}*")
                 lines.append("")
                 lines.append(article.markdown_content)
+
+                # Add webinars section if present
+                if article.webinars:
+                    lines.append("")
+                    lines.append("### Webinars")
+                    lines.append("")
+                    for webinar in article.webinars:
+                        lines.append(f"- **[{webinar.title}]({webinar.url})**")
+                        if webinar.description:
+                            lines.append(f"  - {webinar.description}")
+
+                # Add related articles section if present
+                if article.related_articles:
+                    lines.append("")
+                    lines.append("### Related Articles")
+                    lines.append("")
+                    for related in article.related_articles:
+                        lines.append(f"- [{related.title}]({related.url})")
+
+                # Add videos section if present
+                if article.videos:
+                    lines.append("")
+                    lines.append("### Videos")
+                    lines.append("")
+                    for video in article.videos:
+                        title = video.title or f"Video ({video.video_id})"
+                        lines.append(f"- [{title}]({video.url})")
+
                 lines.append("")
                 lines.append("---")
                 lines.append("")
@@ -400,21 +438,42 @@ async def run_scraper(
     output_dir: Path = Path("output"),
     include_raw_html: bool = False,
     formats: list[str] | None = None,
+    use_browser: bool = False,
+    enrich: bool = False,
+    export_neo4j: bool = False,
+    llm_provider: str = "openai",
+    resume_enrichment: bool = True,
+    chunk: bool = False,
+    embed: bool = False,
+    embedding_provider: str = "openai",
+    estimate_cost: bool = False,
 ) -> RequirementsManagementGuide:
     """Run the scraper and save outputs.
 
     Args:
-        output_dir: Directory for output files
-        include_raw_html: Whether to include raw HTML in output
-        formats: List of output formats ("json", "jsonl", "markdown")
+        output_dir: Directory for output files.
+        include_raw_html: Whether to include raw HTML in output.
+        formats: List of output formats ("json", "jsonl", "markdown").
+        use_browser: If True, use Playwright for JS rendering.
+        enrich: If True, run LangExtract semantic enrichment.
+        export_neo4j: If True, generate Neo4j import files.
+        llm_provider: LLM provider for enrichment ("openai", "gemini", "ollama").
+        resume_enrichment: If True, resume from checkpoint.
+        chunk: If True, chunk articles for GraphRAG retrieval.
+        embed: If True, generate embeddings for chunks.
+        embedding_provider: Embedding provider ("openai").
+        estimate_cost: If True, estimate embedding cost and exit.
 
     Returns:
-        The scraped guide data
+        The scraped guide data.
     """
     if formats is None:
         formats = ["json", "jsonl"]
 
-    scraper = JamaGuideScraper(include_raw_html=include_raw_html)
+    scraper = JamaGuideScraper(
+        include_raw_html=include_raw_html,
+        use_browser=use_browser,
+    )
     guide = await scraper.scrape_all()
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -428,4 +487,204 @@ async def run_scraper(
     if "markdown" in formats:
         scraper.save_markdown(guide, output_dir / "requirements_management_guide.md")
 
+    # Run enrichment if requested
+    enriched_guide = None
+    if enrich:
+        enriched_guide = await _run_enrichment(
+            guide, output_dir, llm_provider, resume_enrichment
+        )
+
+    # Run chunking if requested
+    chunked_guide = None
+    if chunk:
+        chunked_guide = _run_chunking(guide, enriched_guide, output_dir)
+
+        # Run embedding if requested
+        if embed:
+            await _run_embedding(
+                chunked_guide,
+                output_dir,
+                embedding_provider,
+                estimate_cost,
+            )
+
+    # Export to Neo4j if requested (includes chunks if available)
+    if export_neo4j and enriched_guide:
+        _export_to_neo4j(guide, enriched_guide, output_dir, chunked_guide)
+
     return guide
+
+
+async def _run_enrichment(
+    guide: RequirementsManagementGuide,
+    output_dir: Path,
+    llm_provider: str,
+    resume: bool,
+) -> "EnrichedGuide | None":
+    """Run LangExtract semantic enrichment on the guide.
+
+    Args:
+        guide: Scraped guide to enrich.
+        output_dir: Directory for output files.
+        llm_provider: LLM provider name.
+        resume: Whether to resume from checkpoint.
+
+    Returns:
+        EnrichedGuide or None if enrichment failed.
+    """
+    from .enrichment_config import EnrichmentConfig, LLMProvider
+    from .extractor import JamaExtractor, check_langextract_available
+
+    if not check_langextract_available():
+        from .extractor import LangExtractNotAvailableError
+
+        raise LangExtractNotAvailableError
+
+    console.print("\n[bold cyan]Starting LLM enrichment...[/]")
+
+    # Create configuration
+    provider = LLMProvider(llm_provider.lower())
+    config = EnrichmentConfig(
+        provider=provider,
+        checkpoint_dir=output_dir / ".enrichment_cache",
+    )
+
+    # Run extraction
+    extractor = JamaExtractor(config)
+    enriched_guide = await extractor.enrich_guide(guide, resume=resume)
+
+    # Save enriched guide
+    enriched_path = output_dir / "enriched_guide.json"
+    enriched_path.write_text(
+        enriched_guide.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    console.print(f"[green]Saved enriched guide to: {enriched_path}[/]")
+
+    return enriched_guide
+
+
+def _run_chunking(
+    guide: RequirementsManagementGuide,
+    enriched_guide: "EnrichedGuide | None",
+    output_dir: Path,
+) -> "ChunkedGuide":
+    """Chunk articles for GraphRAG retrieval.
+
+    Args:
+        guide: Scraped guide with articles.
+        enriched_guide: Optional enriched guide for entity linkage.
+        output_dir: Directory for output files.
+
+    Returns:
+        ChunkedGuide with all chunks.
+    """
+    from .chunk_export import ChunkExporter
+    from .chunker import JamaChunker, check_chunking_available
+    from .chunking_config import ChunkingConfig
+
+    if not check_chunking_available():
+        from .chunker import ChunkingNotAvailableError
+
+        raise ChunkingNotAvailableError
+
+    # Create chunker with default config
+    config = ChunkingConfig(
+        checkpoint_dir=output_dir / ".chunking_cache",
+    )
+    chunker = JamaChunker(config)
+
+    # Chunk the guide
+    chunked_guide = chunker.chunk_guide(guide, enriched_guide)
+
+    # Export chunks
+    exporter = ChunkExporter(output_dir)
+    exporter.export_chunks_jsonl(chunked_guide)
+
+    return chunked_guide
+
+
+async def _run_embedding(
+    chunked_guide: "ChunkedGuide",
+    output_dir: Path,
+    embedding_provider: str,
+    estimate_cost: bool,
+) -> "EmbeddedGuideChunks | None":
+    """Generate embeddings for chunks.
+
+    Args:
+        chunked_guide: ChunkedGuide with chunks to embed.
+        output_dir: Directory for output files.
+        embedding_provider: Embedding provider name.
+        estimate_cost: If True, only estimate cost and exit.
+
+    Returns:
+        EmbeddedGuideChunks or None if cost estimation only.
+    """
+    from .chunk_export import ChunkExporter
+    from .embedder import JamaEmbedder, check_embedding_available
+    from .embedding_config import EmbeddingConfig, EmbeddingProvider
+
+    if not check_embedding_available():
+        from .embedder import EmbeddingNotAvailableError
+
+        raise EmbeddingNotAvailableError
+
+    # Create configuration
+    provider = EmbeddingProvider(embedding_provider.lower())
+    config = EmbeddingConfig(
+        provider=provider,
+        checkpoint_dir=output_dir / ".embedding_cache",
+    )
+
+    embedder = JamaEmbedder(config)
+
+    # Estimate cost if requested
+    cost_info = embedder.estimate_cost(chunked_guide)
+    console.print("\n[cyan]Embedding cost estimate:[/]")
+    console.print(f"  Chunks: {cost_info['total_chunks']}")
+    console.print(f"  Tokens: {cost_info['total_tokens']:,}")
+    console.print(f"  Model: {cost_info['model']}")
+    console.print(f"  Estimated cost: ${cost_info['estimated_cost_usd']:.4f}")
+
+    if estimate_cost:
+        console.print("\n[yellow]Dry run: --estimate-cost specified, not embedding[/]")
+        return None
+
+    # Generate embeddings
+    embedded_guide = await embedder.embed_chunks(chunked_guide, resume=True)
+
+    # Export embeddings
+    exporter = ChunkExporter(output_dir)
+    exporter.export_embeddings_jsonl(embedded_guide)
+
+    return embedded_guide
+
+
+def _export_to_neo4j(
+    guide: RequirementsManagementGuide,
+    enriched_guide: "EnrichedGuide",
+    output_dir: Path,
+    chunked_guide: "ChunkedGuide | None" = None,
+) -> None:
+    """Export guide and enrichment to Neo4j formats.
+
+    Args:
+        guide: Original scraped guide.
+        enriched_guide: Enriched guide with entities/relationships.
+        output_dir: Directory for output files.
+        chunked_guide: Optional chunked guide for chunk nodes.
+    """
+    from .graph_export import Neo4jExporter
+
+    console.print("\n[bold cyan]Exporting to Neo4j formats...[/]")
+
+    exporter = Neo4jExporter(output_dir)
+    exporter.export_all(guide, enriched_guide)
+
+    # Export chunk nodes if available
+    if chunked_guide:
+        from .chunk_export import ChunkExporter
+
+        chunk_exporter = ChunkExporter(output_dir)
+        chunk_exporter.export_neo4j(chunked_guide)

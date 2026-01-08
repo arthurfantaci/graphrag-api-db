@@ -9,7 +9,14 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 from .config import BASE_URL
-from .models import CrossReference, ImageReference, Section, VideoReference
+from .models import (
+    CrossReference,
+    ImageReference,
+    RelatedArticle,
+    Section,
+    VideoReference,
+    WebinarReference,
+)
 
 # Constants for content extraction
 MIN_CONCEPT_LENGTH = 2
@@ -100,6 +107,8 @@ class HTMLParser:
                 "key_concepts": [],
                 "images": [],
                 "videos": [],
+                "webinars": [],
+                "related_articles": [],
             }
 
         # Clean HTML: remove style, script, and other non-content elements
@@ -108,9 +117,15 @@ class HTMLParser:
         # Extract cross-references before converting to markdown
         cross_refs = self._extract_cross_references(content_elem, source_url)
 
-        # Extract images and videos
+        # Extract images, videos, webinars, and related articles
         images = self._extract_images(content_elem, source_url)
         videos = self._extract_videos(content_elem, source_url)
+        webinars = self._extract_webinars(content_elem, source_url)
+        related_articles = self._extract_related_articles(content_elem, source_url)
+
+        # Inject webinar links into content before markdown conversion
+        # This ensures webinar URLs appear inline where they belong
+        self._inject_webinar_links(content_elem, webinars)
 
         # Convert to markdown (includes images and videos)
         markdown = self._html_to_markdown(content_elem, include_images=True)
@@ -132,6 +147,8 @@ class HTMLParser:
             "key_concepts": key_concepts,
             "images": images,
             "videos": videos,
+            "webinars": webinars,
+            "related_articles": related_articles,
         }
 
     def parse_glossary(self, html: str, _source_url: str) -> list[dict]:
@@ -155,22 +172,70 @@ class HTMLParser:
 
         terms = []
 
-        # Glossaries often use dt/dd, h3/p, or strong/text patterns
-        # Try multiple strategies
+        # Glossaries can use tables, dt/dd, h3/p, or strong/text patterns.
+        # Try strategies in order of reliability (most structured first).
 
-        # Strategy 1: Definition lists
-        for dl in content_elem.find_all("dl"):
-            dts = dl.find_all("dt")
-            dds = dl.find_all("dd")
-            for dt, dd in zip(dts, dds, strict=False):
-                terms.append(
-                    {
-                        "term": dt.get_text(strip=True),
-                        "definition": dd.get_text(strip=True),
-                    }
+        # Strategy 1: Table-based glossary (ACRONYM | TERM | DEFINITION columns)
+        # Tables with explicit column headers are the most reliable format.
+        for table in content_elem.find_all("table"):
+            # Check if this looks like a glossary table
+            header_row = table.find("tr", class_=re.compile(r"heading", re.IGNORECASE))
+            if not header_row:
+                header_row = table.find("tr")  # First row may be header
+
+            if not header_row:
+                continue
+
+            # Get column headers
+            headers = [
+                th.get_text(strip=True).upper()
+                for th in header_row.find_all(["th", "td"])
+            ]
+
+            # Check for expected columns
+            if "TERM" not in headers or "DEFINITION" not in headers:
+                continue
+
+            # Find column indices
+            acronym_idx = headers.index("ACRONYM") if "ACRONYM" in headers else None
+            term_idx = headers.index("TERM")
+            definition_idx = headers.index("DEFINITION")
+
+            # Parse data rows (skip header)
+            for tr in table.find_all("tr")[1:]:  # Skip header row
+                cells = tr.find_all("td")
+                if len(cells) < max(term_idx, definition_idx) + 1:
+                    continue
+
+                term = cells[term_idx].get_text(strip=True)
+                definition = cells[definition_idx].get_text(strip=True)
+                acronym = (
+                    cells[acronym_idx].get_text(strip=True)
+                    if acronym_idx is not None and len(cells) > acronym_idx
+                    else None
                 )
 
-        # Strategy 2: Headings followed by paragraphs
+                if term and definition:
+                    terms.append({
+                        "term": term,
+                        "acronym": acronym if acronym else None,
+                        "definition": definition,
+                    })
+
+        # Strategy 2: Definition lists
+        if not terms:
+            for dl in content_elem.find_all("dl"):
+                dts = dl.find_all("dt")
+                dds = dl.find_all("dd")
+                for dt, dd in zip(dts, dds, strict=False):
+                    terms.append(
+                        {
+                            "term": dt.get_text(strip=True),
+                            "definition": dd.get_text(strip=True),
+                        }
+                    )
+
+        # Strategy 3: Headings followed by paragraphs
         if not terms:
             current_term = None
             for elem in content_elem.find_all(["h2", "h3", "h4", "p"]):
@@ -187,7 +252,7 @@ class HTMLParser:
                         )
                         current_term = None
 
-        # Strategy 3: Strong tags for terms
+        # Strategy 4: Strong tags for terms
         if not terms:
             for p in content_elem.find_all("p"):
                 strong = p.find("strong")
@@ -451,13 +516,25 @@ class HTMLParser:
     def _extract_cross_references(
         self, elem: Tag, source_url: str
     ) -> list[CrossReference]:
-        """Extract all links as cross-references."""
+        """Extract all links as cross-references.
+
+        Handles both text links and image links (links wrapping images).
+        For image links, uses the image's title or alt text as the link text.
+        """
         refs = []
         source_domain = urlparse(source_url).netloc
 
         for link in elem.find_all("a", href=True):
             href = link["href"]
             text = link.get_text(strip=True)
+
+            # If no text, check if this is an image link
+            if not text:
+                img = link.find("img")
+                if img:
+                    # Use image title or alt as link text
+                    text = img.get("title", "") or img.get("alt", "") or ""
+                    text = text.strip()
 
             if not text or not href:
                 continue
@@ -614,6 +691,300 @@ class HTMLParser:
             )
 
         return videos
+
+    def _inject_webinar_links(
+        self, elem: Tag, webinars: list[WebinarReference]
+    ) -> None:
+        """Inject webinar links into the HTML before markdown conversion.
+
+        This ensures webinar URLs appear inline in the content where they belong,
+        not just in a separate extracted list. Handles two patterns:
+
+        1. Image links: `<a href="webinar"><img/></a>` -> replaced with text link
+        2. Description headings: "In This Webinar..." -> wrapped with webinar link
+
+        Args:
+            elem: BeautifulSoup Tag to modify in-place.
+            webinars: List of extracted WebinarReference objects.
+        """
+        if not webinars:
+            return
+
+        # Build URL -> webinar mapping for quick lookup
+        webinar_map = {w.url: w for w in webinars}
+
+        # Pattern 1: Replace image links with text links
+        # Find all avia-image-container divs with webinar links
+        container_pattern = re.compile(r"avia-image-container")
+        image_containers = elem.find_all("div", class_=container_pattern)
+        for container in image_containers:
+            link = container.find("a", href=True)
+            if not link:
+                continue
+
+            href = link.get("href", "")
+            # Check if this links to a webinar
+            if "/webinar/" not in href:
+                continue
+
+            # Find the webinar reference
+            webinar = None
+            for url, w in webinar_map.items():
+                if href in url or url in href:
+                    webinar = w
+                    break
+
+            if webinar:
+                # Create a markdown-style text link to replace the image container
+                link_text = f"**📹 [{webinar.title}]({webinar.url})**"
+                # Replace the container with our text
+                new_tag = NavigableString(f"\n\n{link_text}\n\n")
+                container.replace_with(new_tag)
+
+        # Pattern 2: Make "In This Webinar" headings clickable
+        # Find all text containing "In This Webinar"
+        in_this_texts = elem.find_all(
+            string=re.compile(r"In This Webinar", re.IGNORECASE)
+        )
+        for text in in_this_texts:
+            # Get parent heading element
+            parent = text.find_parent(["h2", "h3", "h4", "h5", "h6", "p", "div"])
+            if not parent:
+                continue
+
+            # Find the associated webinar URL from sibling column
+            desc_container = text.find_parent("div", class_=re.compile(r"flex_column"))
+            if not desc_container:
+                continue
+
+            # Look in previous sibling for the webinar link
+            prev_sib = desc_container.find_previous_sibling(
+                "div", class_=re.compile(r"flex_column")
+            )
+            if not prev_sib:
+                continue
+
+            webinar_link = prev_sib.find(
+                "a", href=re.compile(r"/webinar/", re.IGNORECASE)
+            )
+            if not webinar_link:
+                continue
+
+            href = webinar_link.get("href", "")
+
+            # Find the webinar reference
+            webinar = None
+            for url, w in webinar_map.items():
+                if href in url or url in href:
+                    webinar = w
+                    break
+
+            if webinar:
+                # Replace the heading text with a linked version
+                description = parent.get_text(strip=True)
+                link_md = f"**[{description}]({webinar.url})**"
+                new_tag = NavigableString(f"\n\n{link_md}\n\n")
+                parent.replace_with(new_tag)
+
+    def _extract_webinars(self, elem: Tag, source_url: str) -> list[WebinarReference]:
+        """Extract webinar links from the content.
+
+        Identifies links to Jama's webinar resources including:
+        - Featured webinar sections with "In This Webinar" descriptions
+        - Image thumbnails linking to webinars
+        - Text links to webinars
+
+        Args:
+            elem: BeautifulSoup Tag containing the content.
+            source_url: Source URL for resolving relative links.
+
+        Returns:
+            List of WebinarReference objects for webinar links found.
+        """
+        webinars = []
+        seen_urls: set[str] = set()
+
+        # Pattern to identify webinar URLs
+        webinar_pattern = re.compile(
+            r"(resources\.jamasoftware\.com/webinar/|jamasoftware\.com/webinar/)",
+            re.IGNORECASE,
+        )
+
+        # First pass: Find "In This Webinar" descriptions
+        webinar_descriptions = self._find_webinar_descriptions(
+            elem, source_url, webinar_pattern
+        )
+
+        # Second pass: Extract all webinar links
+        for link in elem.find_all("a", href=True):
+            href = link["href"]
+            if not webinar_pattern.search(href):
+                continue
+
+            full_url = urljoin(source_url, href)
+            if full_url in seen_urls:
+                continue
+            seen_urls.add(full_url)
+
+            webinar = self._create_webinar_reference(
+                link, full_url, href, source_url, webinar_descriptions
+            )
+            webinars.append(webinar)
+
+        return webinars
+
+    def _find_webinar_descriptions(
+        self, elem: Tag, source_url: str, webinar_pattern: re.Pattern[str]
+    ) -> dict[str, str]:
+        """Find "In This Webinar" descriptions and map them to URLs.
+
+        These are in two-column layouts: av_three_fifth (image) + av_two_fifth (desc).
+        """
+        descriptions: dict[str, str] = {}
+
+        in_this_texts = elem.find_all(
+            string=re.compile(r"In This Webinar", re.IGNORECASE)
+        )
+        for text in in_this_texts:
+            desc_container = text.find_parent("div", class_=re.compile(r"flex_column"))
+            if not desc_container:
+                continue
+
+            # Get description from parent element
+            description = text.strip()
+            parent_tag = text.find_parent(["h3", "h4", "p", "div"])
+            if parent_tag:
+                description = parent_tag.get_text(strip=True)
+
+            # Find webinar link in previous sibling column
+            prev_sib = desc_container.find_previous_sibling(
+                "div", class_=re.compile(r"flex_column")
+            )
+            if prev_sib:
+                webinar_link = prev_sib.find("a", href=webinar_pattern)
+                if webinar_link:
+                    href = webinar_link.get("href", "")
+                    full_url = urljoin(source_url, href)
+                    descriptions[full_url] = description
+
+        return descriptions
+
+    def _create_webinar_reference(
+        self,
+        link: Tag,
+        full_url: str,
+        href: str,
+        source_url: str,
+        descriptions: dict[str, str],
+    ) -> WebinarReference:
+        """Create a WebinarReference from a link element."""
+        text = link.get_text(strip=True)
+        thumbnail_url = None
+
+        # Handle image links
+        img = link.find("img")
+        if img:
+            if not text:
+                text = img.get("title", "") or img.get("alt", "") or ""
+                text = text.strip()
+
+            # Get thumbnail (prefer actual URL over lazy-load placeholder)
+            thumb = img.get("data-lazy-src") or img.get("data-src") or img.get("src")
+            if thumb and not thumb.startswith("data:"):
+                thumbnail_url = urljoin(source_url, thumb)
+
+        # Extract title from URL if no text
+        if not text:
+            match = re.search(r"/webinar/([^/?#]+)", href)
+            text = match.group(1).replace("-", " ").title() if match else "Webinar"
+
+        # Get context (nearest heading, but not "In This Webinar")
+        context = None
+        prev_heading = link.find_previous(["h2", "h3", "h4"])
+        if prev_heading:
+            heading_text = prev_heading.get_text(strip=True)
+            if "In This Webinar" not in heading_text:
+                context = heading_text
+
+        return WebinarReference(
+            url=full_url,
+            title=text,
+            description=descriptions.get(full_url),
+            thumbnail_url=thumbnail_url,
+            context=context,
+        )
+
+    def _extract_related_articles(
+        self, elem: Tag, source_url: str
+    ) -> list[RelatedArticle]:
+        """Extract explicitly marked related article callouts.
+
+        Identifies "RELATED ARTICLE:" patterns in av_promobox elements,
+        which are editorial callouts to related content.
+
+        Args:
+            elem: BeautifulSoup Tag containing the content.
+            source_url: Source URL for resolving relative links.
+
+        Returns:
+            List of RelatedArticle objects for related article callouts found.
+        """
+        related = []
+        seen_urls: set[str] = set()
+
+        # Find all promobox elements (these contain RELATED ARTICLE callouts)
+        promoboxes = elem.find_all("div", class_=re.compile(r"av_promobox"))
+
+        for box in promoboxes:
+            text = box.get_text(strip=True)
+
+            # Check if this is a RELATED ARTICLE callout
+            if "RELATED ARTICLE" not in text.upper():
+                continue
+
+            # Find the link
+            link = box.find("a", href=True)
+            if not link:
+                continue
+
+            href = link.get("href", "")
+            if not href:
+                continue
+
+            # Normalize URL
+            full_url = urljoin(source_url, href)
+
+            # Skip duplicates
+            if full_url in seen_urls:
+                continue
+            seen_urls.add(full_url)
+
+            # Get link text (article title)
+            title = link.get_text(strip=True)
+            if not title:
+                continue
+
+            # Determine source type based on URL
+            source_type = "external"
+            if "jamasoftware.com" in full_url:
+                if "/blog/" in full_url:
+                    source_type = "blog"
+                elif "/requirements-management-guide/" in full_url:
+                    source_type = "internal"
+                elif "resources.jamasoftware.com" in full_url:
+                    source_type = "resource"
+                else:
+                    source_type = "jama"
+
+            related.append(
+                RelatedArticle(
+                    url=full_url,
+                    title=title,
+                    source_type=source_type,
+                )
+            )
+
+        return related
 
     def _html_to_markdown(self, elem: Tag, include_images: bool = False) -> str:
         """Convert HTML element to markdown."""
@@ -791,12 +1162,20 @@ class HTMLParser:
                 elif child.name == "code":
                     parts.append(f"`{child.get_text()}`")
                 elif child.name == "a":
-                    # Recursively process link text to handle nested formatting
-                    text = self._inline_to_markdown(child)
                     href = child.get("href", "")
-                    if href:
-                        parts.append(f"[{text}]({href})")
+                    # Check if this link wraps an image (image link)
+                    img = child.find("img")
+                    if img:
+                        # For image links, use image title/alt as link text
+                        text = img.get("title", "") or img.get("alt", "") or "Link"
+                        text = text.strip()
                     else:
+                        # Recursively process link text for regular links
+                        text = self._inline_to_markdown(child)
+
+                    if href and text:
+                        parts.append(f"[{text}]({href})")
+                    elif text:
                         parts.append(text)
                 elif child.name == "br":
                     parts.append("\n")
