@@ -436,80 +436,59 @@ class JamaGuideScraper:
 
 async def run_scraper(
     output_dir: Path = Path("output"),
-    include_raw_html: bool = False,
-    formats: list[str] | None = None,
     use_browser: bool = False,
-    enrich: bool = False,
-    export_neo4j: bool = False,
-    llm_provider: str = "openai",
     resume_enrichment: bool = True,
-    chunk: bool = False,
-    embed: bool = False,
-    embedding_provider: str = "openai",
     estimate_cost: bool = False,
 ) -> RequirementsManagementGuide:
-    """Run the scraper and save outputs.
+    """Run the complete Neo4j pipeline.
+
+    This function executes the full pipeline:
+    1. Scrape all articles and glossary
+    2. Extract entities/relationships (LangExtract)
+    3. Chunk articles for RAG retrieval
+    4. Generate embeddings for vector search
+    5. Export Neo4j import files (CSV + Cypher)
 
     Args:
         output_dir: Directory for output files.
-        include_raw_html: Whether to include raw HTML in output.
-        formats: List of output formats ("json", "jsonl", "markdown").
         use_browser: If True, use Playwright for JS rendering.
-        enrich: If True, run LangExtract semantic enrichment.
-        export_neo4j: If True, generate Neo4j import files.
-        llm_provider: LLM provider for enrichment ("openai", "gemini", "ollama").
         resume_enrichment: If True, resume from checkpoint.
-        chunk: If True, chunk articles for GraphRAG retrieval.
-        embed: If True, generate embeddings for chunks.
-        embedding_provider: Embedding provider ("openai").
         estimate_cost: If True, estimate embedding cost and exit.
 
     Returns:
         The scraped guide data.
     """
-    if formats is None:
-        formats = ["json", "jsonl"]
-
     scraper = JamaGuideScraper(
-        include_raw_html=include_raw_html,
+        include_raw_html=False,
         use_browser=use_browser,
     )
-    guide = await scraper.scrape_all()
 
+    # Stage 1: Scrape
+    guide = await scraper.scrape_all()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if "json" in formats:
-        scraper.save_json(guide, output_dir / "requirements_management_guide.json")
+    # Save base outputs (JSON for reference, JSONL for RAG)
+    scraper.save_json(guide, output_dir / "requirements_management_guide.json")
+    scraper.save_jsonl(guide, output_dir / "requirements_management_guide.jsonl")
 
-    if "jsonl" in formats:
-        scraper.save_jsonl(guide, output_dir / "requirements_management_guide.jsonl")
+    # Stage 2: Enrich (entity extraction)
+    enriched_guide = await _run_enrichment(
+        guide, output_dir, "openai", resume_enrichment
+    )
 
-    if "markdown" in formats:
-        scraper.save_markdown(guide, output_dir / "requirements_management_guide.md")
+    # Stage 3: Chunk
+    chunked_guide = _run_chunking(guide, enriched_guide, output_dir)
 
-    # Run enrichment if requested
-    enriched_guide = None
-    if enrich:
-        enriched_guide = await _run_enrichment(
-            guide, output_dir, llm_provider, resume_enrichment
-        )
+    # Stage 4: Embed
+    await _run_embedding(
+        chunked_guide,
+        output_dir,
+        "openai",
+        estimate_cost,
+    )
 
-    # Run chunking if requested
-    chunked_guide = None
-    if chunk:
-        chunked_guide = _run_chunking(guide, enriched_guide, output_dir)
-
-        # Run embedding if requested
-        if embed:
-            await _run_embedding(
-                chunked_guide,
-                output_dir,
-                embedding_provider,
-                estimate_cost,
-            )
-
-    # Export to Neo4j if requested (includes chunks if available)
-    if export_neo4j and enriched_guide:
+    # Stage 5: Export to Neo4j (if not just estimating cost)
+    if not estimate_cost:
         _export_to_neo4j(guide, enriched_guide, output_dir, chunked_guide)
 
     return guide
