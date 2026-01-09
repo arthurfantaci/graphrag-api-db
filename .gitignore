@@ -33,11 +33,8 @@ ENV/
 *.swp
 *.swo
 
-# Output files (keep structure, ignore content)
-output/*.json
-output/*.jsonl
-output/*.md
-!output/.gitkeep
+# Output files (entire directory)
+output/
 
 # OS
 .DS_Store
@@ -48,6 +45,9 @@ Thumbs.db
 .coverage
 htmlcov/
 
+# Linting
+.ruff_cache/
+
 # Environment files (contain secrets)
 .env
 .env.local
@@ -55,5 +55,4 @@ htmlcov/
 
 # Enrichment cache (checkpoint files)
 .enrichment_cache/
-output/.enrichment_cache/
 test_output/

@@ -439,6 +439,7 @@ async def run_scraper(
     use_browser: bool = False,
     resume_enrichment: bool = True,
     estimate_cost: bool = False,
+    load_neo4j: bool = False,
 ) -> RequirementsManagementGuide:
     """Run the complete Neo4j pipeline.
 
@@ -448,12 +449,14 @@ async def run_scraper(
     3. Chunk articles for RAG retrieval
     4. Generate embeddings for vector search
     5. Export Neo4j import files (CSV + Cypher)
+    6. [Optional] Load data directly into Neo4j database
 
     Args:
         output_dir: Directory for output files.
         use_browser: If True, use Playwright for JS rendering.
         resume_enrichment: If True, resume from checkpoint.
         estimate_cost: If True, estimate embedding cost and exit.
+        load_neo4j: If True, load data into Neo4j database.
 
     Returns:
         The scraped guide data.
@@ -490,6 +493,10 @@ async def run_scraper(
     # Stage 5: Export to Neo4j (if not just estimating cost)
     if not estimate_cost:
         _export_to_neo4j(guide, enriched_guide, output_dir, chunked_guide)
+
+    # Stage 6: Load to Neo4j database (optional)
+    if load_neo4j and not estimate_cost:
+        _load_to_neo4j(output_dir)
 
     return guide
 
@@ -667,3 +674,32 @@ def _export_to_neo4j(
 
         chunk_exporter = ChunkExporter(output_dir)
         chunk_exporter.export_neo4j(chunked_guide)
+
+
+def _load_to_neo4j(output_dir: Path) -> None:
+    """Load exported data into Neo4j database.
+
+    Args:
+        output_dir: Directory containing exported Neo4j files.
+
+    Raises:
+        Neo4jConfigError: If required environment variables are not set.
+    """
+    from .exceptions import Neo4jConfigError
+    from .neo4j_loader import Neo4jLoader, get_neo4j_config
+
+    console.print("\n[bold cyan]Loading data into Neo4j...[/]")
+
+    # Get configuration from environment
+    config = get_neo4j_config()
+    if config is None:
+        raise Neo4jConfigError
+
+    uri, username, password = config
+
+    # Load data
+    loader = Neo4jLoader(uri=uri, username=username, password=password)
+    try:
+        loader.load_all(output_dir)
+    finally:
+        loader.close()

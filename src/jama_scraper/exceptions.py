@@ -5,6 +5,7 @@ Provides a hierarchy of exceptions for different error conditions:
 - FetchError: Error during content fetching
 - PlaywrightNotAvailableError: Playwright package not installed
 - BrowserNotInstalledError: Browser binaries not installed
+- Neo4jConfigError: Neo4j environment variables not set
 """
 
 
@@ -52,3 +53,18 @@ class BrowserNotInstalledError(ScraperError):
     def __init__(self) -> None:
         """Initialize BrowserNotInstalledError."""
         super().__init__("Browser not installed. Run: playwright install chromium")
+
+
+class Neo4jConfigError(ScraperError):
+    """Neo4j configuration environment variables not set.
+
+    Raised when --load-neo4j is used but NEO4J_URI, NEO4J_USERNAME,
+    or NEO4J_PASSWORD environment variables are missing.
+    """
+
+    def __init__(self) -> None:
+        """Initialize Neo4jConfigError."""
+        super().__init__(
+            "Neo4j configuration missing. "
+            "Set NEO4J_URI, NEO4J_USERNAME, and NEO4J_PASSWORD environment variables."
+        )

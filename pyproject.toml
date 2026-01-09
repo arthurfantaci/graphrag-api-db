@@ -5,8 +5,11 @@ description = "Scraper to consolidate Jama Software's Requirements Management Gu
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
-authors = [{ name = "Arthur", email = "arthur@example.com" }]
-keywords = ["scraper", "requirements-management", "jama", "llm", "rag"]
+authors = [
+    { name = "Norfolk AI/BI" },
+    { name = "Arthur Fantaci", email = "afantaci@norfolkaibi.com" },
+]
+keywords = ["scraper", "requirements-management", "jama", "llm", "rag", "norfolk-ai-bi"]
 
 dependencies = [
     "httpx>=0.27.0",
@@ -21,6 +24,8 @@ dependencies = [
     # Embeddings (required for Neo4j vector index)
     "openai>=1.0.0",
     "tiktoken>=0.5.0",
+    # Neo4j database driver (for --load-neo4j)
+    "neo4j>=5.0.0",
 ]
 
 [project.scripts]
@@ -35,15 +40,8 @@ packages = ["src/jama_scraper"]
 
 # PEP 735 dependency groups (preferred over [project.optional-dependencies])
 [dependency-groups]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
-    "ruff>=0.14.0",
-    "ty>=0.0.8",
-]
-browser = [
-    "playwright>=1.40.0",
-]
+dev = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0", "ruff>=0.14.0", "ty>=0.0.8"]
+browser = ["playwright>=1.40.0"]
 
 # =============================================================================
 # RUFF CONFIGURATION
@@ -75,61 +73,61 @@ exclude = [
 # Enable a comprehensive set of rules for strict linting
 select = [
     # Core Python
-    "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings
-    "F",      # pyflakes (undefined names, unused imports, etc.)
+    "E", # pycodestyle errors
+    "W", # pycodestyle warnings
+    "F", # pyflakes (undefined names, unused imports, etc.)
 
     # Code quality
-    "B",      # flake8-bugbear (common bugs and design problems)
-    "C4",     # flake8-comprehensions (better list/dict/set comprehensions)
-    "UP",     # pyupgrade (modern Python syntax)
-    "SIM",    # flake8-simplify (simplify code)
-    "RUF",    # ruff-specific rules
+    "B",   # flake8-bugbear (common bugs and design problems)
+    "C4",  # flake8-comprehensions (better list/dict/set comprehensions)
+    "UP",  # pyupgrade (modern Python syntax)
+    "SIM", # flake8-simplify (simplify code)
+    "RUF", # ruff-specific rules
 
     # Imports
-    "I",      # isort (import sorting)
+    "I", # isort (import sorting)
 
     # Documentation
-    "D",      # pydocstyle (docstring conventions)
+    "D", # pydocstyle (docstring conventions)
 
     # Security
-    "S",      # flake8-bandit (security issues)
+    "S", # flake8-bandit (security issues)
 
     # Type annotations
-    "ANN",    # flake8-annotations (type hint coverage)
-    "TCH",    # flake8-type-checking (TYPE_CHECKING block optimization)
+    "ANN", # flake8-annotations (type hint coverage)
+    "TCH", # flake8-type-checking (TYPE_CHECKING block optimization)
 
     # Naming
-    "N",      # pep8-naming (naming conventions)
+    "N", # pep8-naming (naming conventions)
 
     # Error handling
-    "TRY",    # tryceratops (exception handling anti-patterns)
-    "EM",     # flake8-errmsg (exception message formatting)
+    "TRY", # tryceratops (exception handling anti-patterns)
+    "EM",  # flake8-errmsg (exception message formatting)
 
     # Code structure
-    "PIE",    # flake8-pie (misc. lints)
-    "PT",     # flake8-pytest-style (pytest best practices)
-    "RET",    # flake8-return (return statement issues)
-    "ARG",    # flake8-unused-arguments
-    "PL",     # pylint (subset of pylint rules)
+    "PIE", # flake8-pie (misc. lints)
+    "PT",  # flake8-pytest-style (pytest best practices)
+    "RET", # flake8-return (return statement issues)
+    "ARG", # flake8-unused-arguments
+    "PL",  # pylint (subset of pylint rules)
 ]
 
 # Rules to ignore (with explanations)
 ignore = [
     # Allow TODO comments without issue links (practical for learning projects)
-    "TD002",   # Missing author in TODO
-    "TD003",   # Missing issue link in TODO
+    "TD002", # Missing author in TODO
+    "TD003", # Missing issue link in TODO
 
     # Sometimes we need broad exception handling
-    "TRY003",  # Avoid specifying long messages outside exception class
-    "EM101",   # Exception must not use string literal
+    "TRY003", # Avoid specifying long messages outside exception class
+    "EM101",  # Exception must not use string literal
 
     # These conflict with formatter or are too strict
-    "D203",    # one-blank-line-before-class (conflicts with D211)
-    "D213",    # multi-line-summary-second-line (conflicts with D212)
+    "D203", # one-blank-line-before-class (conflicts with D211)
+    "D213", # multi-line-summary-second-line (conflicts with D212)
 
     # Allow assert in tests
-    "S101",    # Use of assert detected
+    "S101", # Use of assert detected
 ]
 
 # Per-file rule ignores
@@ -158,8 +156,8 @@ ignore = [
 # Extractor uses lazy imports for optional langextract dependency
 "**/extractor.py" = ["PLC0415"]
 
-# CLI has many branches and statements due to argument parsing
-"**/cli.py" = ["PLR0912", "PLR0915"]
+# CLI has many branches, statements, and lazy imports for optional features
+"**/cli.py" = ["PLR0912", "PLR0915", "PLC0415", "TRY300", "TRY301"]
 
 # Chunker and embedder use lazy imports for optional dependencies
 "**/chunker.py" = ["PLC0415"]
@@ -178,6 +176,9 @@ ignore = [
 
 # Package init uses categorized __all__ for readability over alphabetical sorting
 "**/__init__.py" = ["RUF022"]
+
+# Neo4j loader has many statements for orchestration and uses neo4j driver types
+"**/neo4j_loader.py" = ["PLR0915", "PLR0913", "ANN401"]
 
 [tool.ruff.lint.pydocstyle]
 # Use Google-style docstrings
