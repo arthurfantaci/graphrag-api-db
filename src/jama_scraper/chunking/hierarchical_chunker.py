@@ -68,8 +68,23 @@ class HierarchicalHTMLSplitter:
             keep_separator=self.config.keep_separator,
         )
 
-    def split_text(self, html_content: str) -> list["Document"]:
+    def split_text(self, html_content: str) -> list[str]:
         """Split HTML content into hierarchical chunks.
+
+        First splits by HTML headers, then applies character splitting
+        to any sections exceeding the threshold.
+
+        Args:
+            html_content: HTML string to split.
+
+        Returns:
+            List of text strings (chunk content).
+        """
+        docs = self.split_text_as_documents(html_content)
+        return [doc.page_content for doc in docs]
+
+    def split_text_as_documents(self, html_content: str) -> list["Document"]:
+        """Split HTML content into hierarchical chunks with metadata.
 
         First splits by HTML headers, then applies character splitting
         to any sections exceeding the threshold.
@@ -117,7 +132,7 @@ class HierarchicalHTMLSplitter:
         Returns:
             List of (Document, start_pos, end_pos) tuples.
         """
-        chunks = self.split_text(html_content)
+        chunks = self.split_text_as_documents(html_content)
         result = []
 
         # Track positions by finding each chunk's content in original
@@ -175,8 +190,20 @@ class MarkdownSplitter:
             keep_separator=self.config.keep_separator,
         )
 
-    def split_text(self, markdown_content: str) -> list["Document"]:
+    def split_text(self, markdown_content: str) -> list[str]:
         """Split markdown content into hierarchical chunks.
+
+        Args:
+            markdown_content: Markdown string to split.
+
+        Returns:
+            List of text strings (chunk content).
+        """
+        docs = self.split_text_as_documents(markdown_content)
+        return [doc.page_content for doc in docs]
+
+    def split_text_as_documents(self, markdown_content: str) -> list["Document"]:
+        """Split markdown content into hierarchical chunks with metadata.
 
         Args:
             markdown_content: Markdown string to split.

@@ -26,22 +26,22 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase normalized name (e.g., 'requirements traceability')",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Original casing for display",
             },
             "definition": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Brief definition if available",
             },
             "aliases": {
-                "type": "list[str]",
+                "type": "LIST",
                 "required": False,
                 "description": "Alternative names or abbreviations",
             },
@@ -56,17 +56,17 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase normalized name",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Original casing for display",
             },
             "severity": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Impact level: high, medium, low",
             },
@@ -81,22 +81,22 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase normalized name",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Original casing for display",
             },
             "artifact_type": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Classification: document, matrix, plan, specification",
             },
             "abbreviation": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Common abbreviation (e.g., 'RTM', 'SRS')",
             },
@@ -111,17 +111,17 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase normalized name",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Original casing for display",
             },
             "rationale": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Why this practice is recommended",
             },
@@ -136,17 +136,17 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase normalized name",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Original casing for display",
             },
             "sequence": {
-                "type": "int",
+                "type": "INTEGER",
                 "required": False,
                 "description": "Typical order in lifecycle (1, 2, 3, ...)",
             },
@@ -161,17 +161,17 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase normalized name",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Original casing for display",
             },
             "responsibilities": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Primary responsibilities",
             },
@@ -186,22 +186,22 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase normalized name",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Official name with proper casing",
             },
             "organization": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Issuing organization (ISO, RTCA, FDA, etc.)",
             },
             "domain": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Application domain (automotive, aerospace, medical)",
             },
@@ -216,22 +216,22 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase normalized name",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Product name with proper casing",
             },
             "vendor": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Tool vendor if specific product",
             },
             "category": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Tool category (RM tool, ALM, testing, etc.)",
             },
@@ -246,17 +246,17 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase normalized name",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Framework name with proper casing",
             },
             "approach": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Iterative, sequential, hybrid",
             },
@@ -273,17 +273,17 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "name": {
-                "type": "str",
+                "type": "STRING",
                 "required": True,
                 "description": "Lowercase canonical industry name",
             },
             "display_name": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Display name with proper casing",
             },
             "regulated": {
-                "type": "bool",
+                "type": "BOOLEAN",
                 "required": False,
                 "description": "Whether this industry is heavily regulated",
             },
@@ -305,7 +305,7 @@ RELATIONSHIP_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "effectiveness": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "How effective: high, medium, low",
             },
@@ -335,7 +335,7 @@ RELATIONSHIP_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {
             "relationship_nature": {
-                "type": "str",
+                "type": "STRING",
                 "required": False,
                 "description": "Nature of the relationship",
             },

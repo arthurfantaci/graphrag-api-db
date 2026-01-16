@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from neo4j_graphrag.experimental.components.kg_writer import ERExtractionTemplate
+    from neo4j_graphrag.experimental.pipeline.kg_builder import ERExtractionTemplate
 
 
 # =============================================================================
@@ -156,7 +156,7 @@ def create_extraction_template() -> ERExtractionTemplate:
         >>> template = create_extraction_template()
         >>> pipeline = SimpleKGPipeline(..., prompt_template=template)
     """
-    from neo4j_graphrag.experimental.components.kg_writer import (
+    from neo4j_graphrag.experimental.pipeline.kg_builder import (
         ERExtractionTemplate,
     )
 

@@ -8,7 +8,9 @@ This package provides:
 
 from jama_scraper.extraction.pipeline import (
     JamaKGPipelineConfig,
+    create_async_neo4j_driver,
     create_jama_kg_pipeline,
+    create_neo4j_driver,
     process_guide_with_pipeline,
 )
 from jama_scraper.extraction.prompts import (
@@ -34,5 +36,7 @@ __all__ = [
     # Pipeline
     "JamaKGPipelineConfig",
     "create_jama_kg_pipeline",
+    "create_neo4j_driver",
+    "create_async_neo4j_driver",
     "process_guide_with_pipeline",
 ]

@@ -545,14 +545,14 @@ async def _run_post_processing(_output_dir: Path) -> None:
     Args:
         _output_dir: Directory for output files (reserved for future use).
     """
-    from .extraction.pipeline import JamaKGPipelineConfig, create_neo4j_driver
+    from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
     from .postprocessing.industry_taxonomy import IndustryNormalizer
     from .postprocessing.normalizer import EntityNormalizer
 
     console.print("\n[bold cyan]Running post-processing...[/]")
 
     config = JamaKGPipelineConfig.from_env()
-    driver = create_neo4j_driver(config)
+    driver = create_async_neo4j_driver(config)
 
     try:
         # Entity normalization
@@ -576,7 +576,7 @@ async def _run_post_processing(_output_dir: Path) -> None:
         )
 
     finally:
-        driver.close()
+        await driver.close()
 
 
 async def _build_supplementary_structure(
@@ -591,14 +591,14 @@ async def _build_supplementary_structure(
         _output_dir: Directory for output files (reserved for future use).
         skip_resources: If True, skip resource nodes.
     """
-    from .extraction.pipeline import JamaKGPipelineConfig, create_neo4j_driver
+    from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
     from .graph.constraints import create_all_constraints, create_vector_index
     from .graph.supplementary import SupplementaryGraphBuilder
 
     console.print("\n[bold cyan]Building supplementary graph structure...[/]")
 
     config = JamaKGPipelineConfig.from_env()
-    driver = create_neo4j_driver(config)
+    driver = create_async_neo4j_driver(config)
 
     try:
         # Create constraints and indexes
@@ -635,7 +635,7 @@ async def _build_supplementary_structure(
             console.print(f"    Definitions: {stats['definitions']}")
 
     finally:
-        driver.close()
+        await driver.close()
 
 
 async def _run_validation(output_dir: Path) -> None:
@@ -644,13 +644,13 @@ async def _run_validation(output_dir: Path) -> None:
     Args:
         output_dir: Directory for output files.
     """
-    from .extraction.pipeline import JamaKGPipelineConfig, create_neo4j_driver
+    from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
     from .validation.reporter import generate_validation_report
 
     console.print("\n[bold cyan]Running validation...[/]")
 
     config = JamaKGPipelineConfig.from_env()
-    driver = create_neo4j_driver(config)
+    driver = create_async_neo4j_driver(config)
 
     try:
         report = await generate_validation_report(
@@ -669,7 +669,7 @@ async def _run_validation(output_dir: Path) -> None:
         console.print(f"\n  Full report: {output_dir / 'validation_report.md'}")
 
     finally:
-        driver.close()
+        await driver.close()
 
 
 async def _run_enrichment(

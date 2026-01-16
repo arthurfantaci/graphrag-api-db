@@ -18,7 +18,7 @@ from jama_scraper.extraction.schema import get_schema_for_pipeline
 
 if TYPE_CHECKING:
     from neo4j import Driver
-    from neo4j_graphrag.experimental.pipeline import SimpleKGPipeline
+    from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
 
     from jama_scraper.models import RequirementsManagementGuide
 
@@ -148,6 +148,23 @@ def create_neo4j_driver(config: JamaKGPipelineConfig) -> "Driver":
     )
 
 
+def create_async_neo4j_driver(config: JamaKGPipelineConfig) -> "Driver":
+    """Create an async Neo4j driver from configuration.
+
+    Args:
+        config: Pipeline configuration.
+
+    Returns:
+        Async Neo4j driver instance for use with async context managers.
+    """
+    from neo4j import AsyncGraphDatabase
+
+    return AsyncGraphDatabase.driver(
+        config.neo4j_uri,
+        auth=(config.neo4j_username, config.neo4j_password),
+    )
+
+
 def create_jama_kg_pipeline(
     config: JamaKGPipelineConfig,
 ) -> "SimpleKGPipeline":
@@ -173,7 +190,7 @@ def create_jama_kg_pipeline(
         >>> await pipeline.run(text="...")
     """
     from neo4j_graphrag.embeddings import OpenAIEmbeddings
-    from neo4j_graphrag.experimental.pipeline import SimpleKGPipeline
+    from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
     from neo4j_graphrag.llm import OpenAILLM
 
     logger.info("Creating Jama KG pipeline", config=config.to_dict())
@@ -230,6 +247,7 @@ def create_jama_kg_pipeline(
         lexical_graph_config=lexical_config,
         perform_entity_resolution=config.perform_entity_resolution,
         neo4j_database=config.neo4j_database,
+        from_pdf=False,  # We're passing text directly, not PDF files
     )
 
     logger.info("Pipeline created successfully")
@@ -257,7 +275,7 @@ async def process_article_with_pipeline(
 
     try:
         # Run the pipeline
-        result = await pipeline.run(
+        result = await pipeline.run_async(
             text=markdown_content,
             document_metadata={
                 "article_id": article_id,
