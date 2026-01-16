@@ -32,7 +32,7 @@ from .config import (
     ChapterConfig,
 )
 from .fetcher import Fetcher, FetcherConfig, create_fetcher
-from .models import (
+from .models_core import (
     Article,
     Chapter,
     ContentType,
@@ -437,26 +437,27 @@ class JamaGuideScraper:
 async def run_scraper(
     output_dir: Path = Path("output"),
     use_browser: bool = False,
-    resume_enrichment: bool = True,
-    estimate_cost: bool = False,
-    load_neo4j: bool = False,
+    scrape_only: bool = False,
+    skip_resources: bool = False,
+    skip_supplementary: bool = False,
+    run_validation: bool = False,
 ) -> RequirementsManagementGuide:
-    """Run the complete Neo4j pipeline.
+    """Run the complete neo4j_graphrag pipeline.
 
     This function executes the full pipeline:
     1. Scrape all articles and glossary
-    2. Extract entities/relationships (LangExtract)
-    3. Chunk articles for RAG retrieval
-    4. Generate embeddings for vector search
-    5. Export Neo4j import files (CSV + Cypher)
-    6. [Optional] Load data directly into Neo4j database
+    2. Process through SimpleKGPipeline (chunking, extraction, embeddings)
+    3. Apply entity normalization and industry consolidation
+    4. Create supplementary structure (chapters, resources, glossary)
+    5. Run validation checks (optional)
 
     Args:
         output_dir: Directory for output files.
         use_browser: If True, use Playwright for JS rendering.
-        resume_enrichment: If True, resume from checkpoint.
-        estimate_cost: If True, estimate embedding cost and exit.
-        load_neo4j: If True, load data into Neo4j database.
+        scrape_only: If True, only scrape articles (no Neo4j processing).
+        skip_resources: If True, skip resource node creation.
+        skip_supplementary: If True, skip all supplementary graph structure.
+        run_validation: If True, run validation and generate report.
 
     Returns:
         The scraped guide data.
@@ -470,35 +471,205 @@ async def run_scraper(
     guide = await scraper.scrape_all()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save base outputs (JSON for reference, JSONL for RAG)
+    # Save base outputs (JSON for reference)
     scraper.save_json(guide, output_dir / "requirements_management_guide.json")
     scraper.save_jsonl(guide, output_dir / "requirements_management_guide.jsonl")
 
-    # Stage 2: Enrich (entity extraction)
-    enriched_guide = await _run_enrichment(
-        guide, output_dir, "openai", resume_enrichment
-    )
+    if scrape_only:
+        console.print("\n[yellow]Scrape-only mode: Skipping Neo4j pipeline[/]")
+        return guide
 
-    # Stage 3: Chunk
-    chunked_guide = _run_chunking(guide, enriched_guide, output_dir)
+    # Stage 2: Process through neo4j_graphrag pipeline
+    pipeline_stats = await _run_neo4j_graphrag_pipeline(guide, output_dir)
 
-    # Stage 4: Embed
-    await _run_embedding(
-        chunked_guide,
-        output_dir,
-        "openai",
-        estimate_cost,
-    )
+    # Stage 3: Post-processing (entity normalization, industry consolidation)
+    await _run_post_processing(output_dir)
 
-    # Stage 5: Export to Neo4j (if not just estimating cost)
-    if not estimate_cost:
-        _export_to_neo4j(guide, enriched_guide, output_dir, chunked_guide)
+    # Stage 4: Supplementary graph structure
+    if not skip_supplementary:
+        await _build_supplementary_structure(
+            guide, output_dir, skip_resources=skip_resources
+        )
 
-    # Stage 6: Load to Neo4j database (optional)
-    if load_neo4j and not estimate_cost:
-        _load_to_neo4j(output_dir)
+    # Stage 5: Validation (optional)
+    if run_validation:
+        await _run_validation(output_dir)
+
+    console.print("\n[bold green]✓ Pipeline complete![/]")
+    console.print(f"  Articles processed: {pipeline_stats.get('processed', 0)}")
+    console.print(f"  Succeeded: {pipeline_stats.get('succeeded', 0)}")
+    if pipeline_stats.get('failed', 0) > 0:
+        console.print(f"  [red]Failed: {pipeline_stats.get('failed', 0)}[/]")
 
     return guide
+
+
+async def _run_neo4j_graphrag_pipeline(
+    guide: RequirementsManagementGuide,
+    output_dir: Path,
+) -> dict:
+    """Run the neo4j_graphrag SimpleKGPipeline.
+
+    Args:
+        guide: Scraped guide to process.
+        output_dir: Directory for output files.
+
+    Returns:
+        Processing statistics.
+    """
+    from .extraction.pipeline import (
+        JamaKGPipelineConfig,
+        process_guide_with_pipeline,
+    )
+
+    console.print("\n[bold cyan]Starting neo4j_graphrag pipeline...[/]")
+
+    # Load configuration from environment
+    config = JamaKGPipelineConfig.from_env()
+
+    console.print(f"  LLM model: {config.llm_model}")
+    console.print(f"  Embedding model: {config.embedding_model}")
+    console.print(f"  Neo4j: {config.neo4j_uri}")
+
+    # Process guide
+    stats = await process_guide_with_pipeline(guide, config, output_dir)
+
+    console.print(f"\n[green]Pipeline processed {stats['processed']} articles[/]")
+
+    return stats
+
+
+async def _run_post_processing(_output_dir: Path) -> None:
+    """Run post-processing: entity normalization and industry consolidation.
+
+    Args:
+        _output_dir: Directory for output files (reserved for future use).
+    """
+    from .extraction.pipeline import JamaKGPipelineConfig, create_neo4j_driver
+    from .postprocessing.industry_taxonomy import IndustryNormalizer
+    from .postprocessing.normalizer import EntityNormalizer
+
+    console.print("\n[bold cyan]Running post-processing...[/]")
+
+    config = JamaKGPipelineConfig.from_env()
+    driver = create_neo4j_driver(config)
+
+    try:
+        # Entity normalization
+        console.print("  Normalizing entity names...")
+        normalizer = EntityNormalizer(driver, config.neo4j_database)
+        norm_stats = await normalizer.normalize_all_entities()
+        console.print(f"    Updated {norm_stats['updated']} entity names")
+
+        # Entity deduplication
+        console.print("  Deduplicating entities...")
+        dedup_stats = await normalizer.deduplicate_by_name()
+        console.print(f"    Merged {dedup_stats['merged']} duplicates")
+
+        # Industry consolidation
+        console.print("  Consolidating industries...")
+        industry_normalizer = IndustryNormalizer(driver, config.neo4j_database)
+        industry_stats = await industry_normalizer.consolidate_industries()
+        console.print(
+            f"    Consolidated {industry_stats['original_count']} → "
+            f"{industry_stats['canonical_count']} industries"
+        )
+
+    finally:
+        driver.close()
+
+
+async def _build_supplementary_structure(
+    guide: RequirementsManagementGuide,
+    _output_dir: Path,
+    skip_resources: bool = False,
+) -> None:
+    """Build supplementary graph structure.
+
+    Args:
+        guide: Scraped guide.
+        _output_dir: Directory for output files (reserved for future use).
+        skip_resources: If True, skip resource nodes.
+    """
+    from .extraction.pipeline import JamaKGPipelineConfig, create_neo4j_driver
+    from .graph.constraints import create_all_constraints, create_vector_index
+    from .graph.supplementary import SupplementaryGraphBuilder
+
+    console.print("\n[bold cyan]Building supplementary graph structure...[/]")
+
+    config = JamaKGPipelineConfig.from_env()
+    driver = create_neo4j_driver(config)
+
+    try:
+        # Create constraints and indexes
+        console.print("  Creating constraints and indexes...")
+        await create_all_constraints(driver, config.neo4j_database)
+        await create_vector_index(
+            driver,
+            config.neo4j_database,
+            dimensions=config.embedding_dimensions,
+        )
+
+        # Build supplementary structure
+        builder = SupplementaryGraphBuilder(driver, config.neo4j_database)
+
+        if skip_resources:
+            # Only create chapters and article relationships
+            from .graph.supplementary import (
+                create_article_relationships,
+                create_chapter_structure,
+            )
+
+            console.print("  Creating chapter structure...")
+            await create_chapter_structure(driver, guide, config.neo4j_database)
+
+            console.print("  Creating article relationships...")
+            await create_article_relationships(driver, guide, config.neo4j_database)
+        else:
+            console.print("  Creating all supplementary nodes...")
+            stats = await builder.build_all(guide)
+            console.print(f"    Chapters: {stats['chapters']}")
+            console.print(f"    Images: {stats['images']}")
+            console.print(f"    Videos: {stats['videos']}")
+            console.print(f"    Webinars: {stats['webinars']}")
+            console.print(f"    Definitions: {stats['definitions']}")
+
+    finally:
+        driver.close()
+
+
+async def _run_validation(output_dir: Path) -> None:
+    """Run validation and generate report.
+
+    Args:
+        output_dir: Directory for output files.
+    """
+    from .extraction.pipeline import JamaKGPipelineConfig, create_neo4j_driver
+    from .validation.reporter import generate_validation_report
+
+    console.print("\n[bold cyan]Running validation...[/]")
+
+    config = JamaKGPipelineConfig.from_env()
+    driver = create_neo4j_driver(config)
+
+    try:
+        report = await generate_validation_report(
+            driver,
+            config.neo4j_database,
+            output_path=output_dir / "validation_report.md",
+        )
+
+        if report.validation_passed:
+            console.print("[green]✓ Validation passed[/]")
+        else:
+            console.print("[yellow]⚠ Validation found issues[/]")
+            for rec in report.recommendations[:3]:
+                console.print(f"  - {rec}")
+
+        console.print(f"\n  Full report: {output_dir / 'validation_report.md'}")
+
+    finally:
+        driver.close()
 
 
 async def _run_enrichment(

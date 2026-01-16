@@ -9,7 +9,7 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 from .config import BASE_URL
-from .models import (
+from .models_core import (
     CrossReference,
     ImageReference,
     RelatedArticle,
