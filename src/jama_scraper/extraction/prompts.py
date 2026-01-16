@@ -160,22 +160,36 @@ def create_extraction_template() -> ERExtractionTemplate:
         ERExtractionTemplate,
     )
 
-    # Combine domain instructions with default template
-    custom_template = REQUIREMENTS_DOMAIN_INSTRUCTIONS + "\n\n" + """
-## EXTRACTION TASK:
+    # Template must include the required JSON output format from neo4j_graphrag
+    # plus our domain-specific instructions
+    custom_template = """You are a top-tier algorithm designed for extracting
+information in structured formats to build a knowledge graph.
 
-Given the following text, extract entities and relationships according to
-the schema provided. Follow the classification rules and examples above.
+Extract the entities (nodes) and specify their type from the following text.
+Also extract the relationships between these nodes.
 
-Text to analyze:
-{text}
+Return result as JSON using the following format:
+{{"nodes": [ {{"id": "0", "label": "Concept", "properties": {{"name": "traceability", "display_name": "Traceability"}} }}],
+"relationships": [{{"type": "ADDRESSES", "start_node_id": "0", "end_node_id": "1", "properties": {{}} }}] }}
 
-Schema:
+Use only the following node and relationship types:
 {schema}
 
-Extract all relevant entities and relationships. Return them in the
-specified JSON format.
-"""
+Assign a unique ID (string) to each node, and reuse it to define relationships.
+Do respect the source and target node types for relationship and
+the relationship direction.
+
+Make sure you adhere to the following rules to produce valid JSON objects:
+- Do not return any additional information other than the JSON in it.
+- Omit any backticks around the JSON - simply output the JSON on its own.
+- The JSON object must not wrapped into a list - it is its own JSON object.
+- Property names must be enclosed in double quotes
+
+""" + REQUIREMENTS_DOMAIN_INSTRUCTIONS + """
+
+Input text:
+
+{text}"""
 
     return ERExtractionTemplate(template=custom_template)
 

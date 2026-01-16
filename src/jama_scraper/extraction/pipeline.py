@@ -338,11 +338,11 @@ async def process_guide_with_pipeline(
         # Process each article
         for chapter in guide.chapters:
             for article in chapter.articles:
-                # Build metadata
+                # Build metadata (neo4j_graphrag requires string values)
                 metadata = {
-                    "chapter_number": chapter.chapter_number,
+                    "chapter_number": str(chapter.chapter_number),
                     "chapter_title": chapter.title,
-                    "article_number": article.article_number,
+                    "article_number": str(article.article_number),
                     "article_title": article.title,
                     "url": article.url,
                     "content_type": article.content_type.value,
