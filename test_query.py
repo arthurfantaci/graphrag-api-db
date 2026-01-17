@@ -126,7 +126,11 @@ def display_vector_results(results: RetrieverResult) -> list[str | None]:
     chunk_ids = []
     for i, item in enumerate(results.items, 1):
         chunk_ids.append(item.metadata.get("element_id") if item.metadata else None)
-        text = item.content.get("text", "")[:300] if isinstance(item.content, dict) else str(item.content)[:300]
+        text = (
+            item.content.get("text", "")[:300]
+            if isinstance(item.content, dict)
+            else str(item.content)[:300]
+        )
         score = item.metadata.get("score", 0.0) if item.metadata else 0.0
         console.print(f"\n[yellow]Result {i}[/] (score: {score:.3f})")
         console.print(f"{text}...")
@@ -186,8 +190,14 @@ def display_relationships(relationships: list[dict], entity_name: str) -> None:
 
 def main() -> None:
     """Run the knowledge graph query demonstration."""
-    query = sys.argv[1] if len(sys.argv) > 1 else "What can you tell me about Requirements Tracing?"
-    console.print(Panel(f"[bold cyan]Query:[/] {query}", title="Jama Guide Knowledge Graph Test"))
+    query = (
+        sys.argv[1]
+        if len(sys.argv) > 1
+        else "What can you tell me about Requirements Tracing?"
+    )
+    console.print(
+        Panel(f"[bold cyan]Query:[/] {query}", title="Jama Guide Knowledge Graph Test")
+    )
 
     driver = get_driver()
     try:
@@ -197,12 +207,20 @@ def main() -> None:
 
         # 2. Entities from retrieved chunks
         valid_chunk_ids = [cid for cid in chunk_ids if cid]
-        entities = get_entities_from_chunks(driver, valid_chunk_ids) if valid_chunk_ids else []
-        display_entity_table(entities, "2. Entities Mentioned in Retrieved Chunks", "Mentions")
+        entities = (
+            get_entities_from_chunks(driver, valid_chunk_ids) if valid_chunk_ids else []
+        )
+        display_entity_table(
+            entities, "2. Entities Mentioned in Retrieved Chunks", "Mentions"
+        )
 
         # 3. Direct entity search
         direct_results = search_entities_by_name(driver, "trac")
-        display_entity_table(direct_results, "3. Direct Entity Search (name contains 'trac')", "Connections")
+        display_entity_table(
+            direct_results,
+            "3. Direct Entity Search (name contains 'trac')",
+            "Connections",
+        )
 
         # 4. Relationships for top result
         if direct_results:
