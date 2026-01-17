@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""
-Quick-run script for the Jama Guide Scraper.
+"""Quick-run script for the Jama Guide Scraper.
 
 Usage:
     python run.py
-    
+
     # Or with UV:
     uv run python run.py
 """
@@ -14,6 +13,7 @@ from pathlib import Path
 
 # Add src to path for development
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from jama_scraper import run_scraper
@@ -25,7 +25,7 @@ async def main():
         output_dir=Path("output"),
         formats=["json", "jsonl", "markdown"],
     )
-    
+
     print(f"\n{'=' * 60}")
     print("SCRAPING SUMMARY")
     print(f"{'=' * 60}")
@@ -35,7 +35,7 @@ async def main():
     print(f"Total Words: {guide.total_word_count:,}")
     if guide.glossary:
         print(f"Glossary Terms: {guide.glossary.term_count}")
-    print(f"\nOutput files saved to: ./output/")
+    print("\nOutput files saved to: ./output/")
 
 
 if __name__ == "__main__":
