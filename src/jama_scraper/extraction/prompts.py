@@ -131,6 +131,62 @@ Extract:
   - abbreviation: "SRS"
 - Relationship: (requirements gathering)-[PRODUCES]->(requirements specification)
 
+## COMMON MISTAKES TO AVOID (Negative Examples):
+
+### ✗ WRONG: Concept -[USED_BY]-> Tool
+Text: "Teams use Excel and Word for requirements management in software development."
+
+INCORRECT extraction:
+- (software development)-[USED_BY]->(excel)  ← WRONG DIRECTION!
+- (software development)-[USED_BY]->(word)   ← WRONG DIRECTION!
+
+CORRECT extraction:
+- Entity: Tool { name: "excel" }
+- Entity: Tool { name: "word" }
+- Entity: Concept { name: "requirements management" }
+- NO relationship between Concept and Tool (USED_BY is for Role/Industry → Tool)
+
+**Rule**: USED_BY relationships go FROM Role or Industry TO Tool, never from Concept.
+- ✓ (systems engineer)-[USED_BY]->(jama connect)
+- ✓ (aerospace)-[USED_BY]->(matlab)
+- ✗ (automation)-[USED_BY]->(jama connect)
+
+### ✗ WRONG: Certification Organizations as Standards
+Text: "TÜV SÜD certified the product for functional safety compliance."
+
+INCORRECT extraction:
+- Entity: Standard { name: "tüv süd" }  ← WRONG! TÜV SÜD is an organization
+
+CORRECT extraction:
+- Do NOT create an entity for TÜV SÜD (it's a certification body, not a standard)
+- Or if relevant, note it as context but not as a Standard node
+
+**Rule**: These are certification ORGANIZATIONS, not standards:
+- ✗ TÜV SÜD, TÜV Rheinland, TÜV Nord (German certification bodies)
+- ✗ UL (Underwriters Laboratories)
+- ✗ SGS, Bureau Veritas, Intertek (testing companies)
+- ✗ FDA, FAA, EASA (regulatory agencies - they ENFORCE standards, they ARE NOT standards)
+
+Standards have alphanumeric designations like: ISO 26262, DO-178C, IEC 62304, IEEE 830
+
+### ✗ WRONG: Standard -[APPLIES_TO]-> Concept
+Text: "ISO/IEC 12207 covers systems and software engineering lifecycle processes."
+
+INCORRECT extraction:
+- (iso/iec 12207)-[APPLIES_TO]->(systems and software engineering)  ← WRONG!
+
+CORRECT extraction:
+- Entity: Standard { name: "iso/iec 12207", organization: "ISO/IEC" }
+- Entity: Concept { name: "software lifecycle", definition: "..." }
+- Relationship: (iso/iec 12207)-[DEFINES]->(software lifecycle)
+
+**Rule**: Standards APPLY_TO Industries (vertical markets), not Concepts.
+- ✓ (iso 26262)-[APPLIES_TO]->(automotive)
+- ✓ (do-178c)-[APPLIES_TO]->(aerospace)
+- ✗ (iso 26262)-[APPLIES_TO]->(functional safety)  ← functional safety is a Concept!
+
+Use DEFINES when a standard defines or specifies a concept.
+
 ## ADDITIONAL GUIDELINES:
 
 1. **Be specific**: "bidirectional traceability" is more valuable than just "traceability"
@@ -138,6 +194,7 @@ Extract:
 3. **Capture relationships**: The graph structure is as valuable as the entities
 4. **Use patterns**: Only create relationships matching the defined PATTERNS
 5. **Include context**: Add definition/description properties when text provides them
+6. **Check relationship direction**: Always verify source→target matches allowed patterns
 
 """
 
