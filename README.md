@@ -215,6 +215,7 @@ jama-guide-scraper/
 │   ├── test_postprocessing.py
 │   └── test_validation.py
 ├── pyproject.toml            # Project configuration
+├── test_query.py             # Knowledge graph query demo
 ├── .env.example              # Environment template
 └── CLAUDE.md                 # AI assistant guidance
 ```
@@ -269,6 +270,47 @@ MATCH (c:Chunk) WHERE c.embedding IS NULL RETURN count(c)
 ```
 
 ## Querying the Knowledge Graph
+
+### Test Script (Recommended)
+
+A ready-to-use test script is included for evaluating the knowledge graph:
+
+```bash
+# Run with default query
+uv run python test_query.py
+
+# Run with custom query
+uv run python test_query.py "What is impact analysis?"
+```
+
+The script demonstrates four query approaches:
+1. **Vector similarity search** - Semantic matching on chunk embeddings
+2. **Chunk-to-entity traversal** - Find entities mentioned in retrieved chunks
+3. **Direct entity search** - Search entities by name pattern
+4. **Relationship exploration** - Show connections for a specific entity
+
+Example output:
+```
+╭────────────────────── Jama Guide Knowledge Graph Test ───────────────────────╮
+│ Query: What can you tell me about Requirements Tracing?                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+1. Vector Similarity Search (semantic match)
+------------------------------------------------------------
+Result 1 (score: 0.851)
+In simple terms, requirements traceability is the process of creating
+and maintaining connections between different development artifacts...
+
+3. Direct Entity Search (name contains 'trac')
+------------------------------------------------------------
+┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Type     ┃ Name                     ┃ Connections ┃ Definition               ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Concept  │ Traceability             │         370 │ the only way to know...  │
+│ Concept  │ Requirements Traceability│         147 │ the practice of linking..│
+│ Concept  │ Live Traceability        │          84 │ The ability for any...   │
+└──────────┴──────────────────────────┴─────────────┴──────────────────────────┘
+```
 
 ### Semantic Search (RAG)
 
