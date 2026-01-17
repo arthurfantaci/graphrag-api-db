@@ -69,7 +69,9 @@ class TestExtractionSchema:
 
         # RELATIONSHIP_TYPES is a dict with label as key
         for expected in expected_rels:
-            assert expected in RELATIONSHIP_TYPES, f"Missing relationship type: {expected}"
+            assert expected in RELATIONSHIP_TYPES, (
+                f"Missing relationship type: {expected}"
+            )
 
     def test_patterns_are_valid_triples(self) -> None:
         """Test that patterns are valid (source, rel, target) triples."""
@@ -95,7 +97,9 @@ class TestExtractionSchema:
         from jama_scraper.extraction.schema import PATTERNS
 
         # Should have at least 20 patterns for a rich schema
-        assert len(PATTERNS) >= 20, f"Expected at least 20 patterns, got {len(PATTERNS)}"
+        assert len(PATTERNS) >= 20, (
+            f"Expected at least 20 patterns, got {len(PATTERNS)}"
+        )
 
     def test_industry_has_regulated_property(self) -> None:
         """Test that Industry node type has regulated property."""
@@ -153,7 +157,10 @@ class TestExtractionPrompts:
         assert "USED_BY" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
 
         # Should warn about certification organizations
-        assert "TÜV" in REQUIREMENTS_DOMAIN_INSTRUCTIONS or "certification" in REQUIREMENTS_DOMAIN_INSTRUCTIONS.lower()
+        assert (
+            "TÜV" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
+            or "certification" in REQUIREMENTS_DOMAIN_INSTRUCTIONS.lower()
+        )
 
         # Should warn about Standard -[APPLIES_TO]-> Concept
         assert "Standard" in REQUIREMENTS_DOMAIN_INSTRUCTIONS

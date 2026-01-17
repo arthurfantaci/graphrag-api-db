@@ -76,7 +76,9 @@ class TestHierarchicalHTMLSplitter:
             assert isinstance(chunk, str)
             assert len(chunk) > 0
 
-    def test_split_returns_documents(self, sample_article_html_with_headers: str) -> None:
+    def test_split_returns_documents(
+        self, sample_article_html_with_headers: str
+    ) -> None:
         """Test that split_text_as_documents returns Document objects."""
         from jama_scraper.chunking.hierarchical_chunker import HierarchicalHTMLSplitter
 

@@ -231,7 +231,7 @@ class TestModelSerialization:
                 url="https://example.com/glossary",
                 terms=[
                     GlossaryTerm(term="Test", definition="A test term."),
-                ]
+                ],
             ),
         )
 

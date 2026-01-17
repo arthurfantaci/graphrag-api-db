@@ -71,9 +71,7 @@ class SupplementaryGraphBuilder:
         stats["chapters"] = chapter_stats.get("chapters_created", 0)
 
         # Create resource nodes
-        resource_stats = await create_resource_nodes(
-            self.driver, guide, self.database
-        )
+        resource_stats = await create_resource_nodes(self.driver, guide, self.database)
         stats["images"] = resource_stats.get("images", 0)
         stats["videos"] = resource_stats.get("videos", 0)
         stats["webinars"] = resource_stats.get("webinars", 0)

@@ -80,7 +80,8 @@ class ImageResource(BaseResource):
     def is_figure(self) -> bool:
         """Whether this appears to be a labeled figure vs inline image."""
         return self.has_caption or (
-            self.alt_text and any(
+            self.alt_text
+            and any(
                 keyword in self.alt_text.lower()
                 for keyword in ["figure", "diagram", "chart", "graph", "flow"]
             )

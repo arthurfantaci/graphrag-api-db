@@ -28,7 +28,10 @@ class TestArticleIndex:
         from jama_scraper.loaders.index_builder import ArticleIndex
 
         index = ArticleIndex()
-        index.by_id["ch1-art1"] = {"title": "Test Article", "url": "https://example.com"}
+        index.by_id["ch1-art1"] = {
+            "title": "Test Article",
+            "url": "https://example.com",
+        }
 
         article = index.get_article("ch1-art1")
         assert article is not None

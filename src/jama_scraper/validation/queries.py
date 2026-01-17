@@ -255,11 +255,13 @@ async def run_all_validations(
     }
 
     # Overall status
-    results["validation_passed"] = all([
-        not results["summary"]["has_orphan_chunks"],
-        not results["summary"]["has_duplicates"],
-        results["summary"]["industry_count_ok"],
-    ])
+    results["validation_passed"] = all(
+        [
+            not results["summary"]["has_orphan_chunks"],
+            not results["summary"]["has_duplicates"],
+            results["summary"]["industry_count_ok"],
+        ]
+    )
 
     logger.info(
         "Validation complete",

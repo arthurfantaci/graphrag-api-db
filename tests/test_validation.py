@@ -182,7 +182,9 @@ class TestRunAllValidations:
         session.set_result("orphan_count", [{"orphan_count": 0}])
         session.set_result("missing_count", [{"missing_count": 0}])
         session.set_result("industry_count", [{"industry_count": 18}])
-        session.set_result("total_articles", [{"total_articles": 103, "chapters_with_articles": 15}])
+        session.set_result(
+            "total_articles", [{"total_articles": 103, "chapters_with_articles": 15}]
+        )
         session.set_default_result([])
         driver = MockDriver(session)
 
@@ -207,7 +209,9 @@ class TestRunAllValidations:
         session.set_result("orphan_count", [{"orphan_count": 0}])
         session.set_result("missing_count", [{"missing_count": 0}])
         session.set_result("industry_count", [{"industry_count": 15}])
-        session.set_result("total_articles", [{"total_articles": 103, "chapters_with_articles": 15}])
+        session.set_result(
+            "total_articles", [{"total_articles": 103, "chapters_with_articles": 15}]
+        )
         session.set_default_result([])
         driver = MockDriver(session)
 
@@ -224,7 +228,9 @@ class TestRunAllValidations:
         session.set_result("orphan_count", [{"orphan_count": 5}])  # Has orphans
         session.set_result("missing_count", [{"missing_count": 0}])
         session.set_result("industry_count", [{"industry_count": 15}])
-        session.set_result("total_articles", [{"total_articles": 103, "chapters_with_articles": 15}])
+        session.set_result(
+            "total_articles", [{"total_articles": 103, "chapters_with_articles": 15}]
+        )
         session.set_default_result([])
         driver = MockDriver(session)
 
@@ -241,7 +247,9 @@ class TestRunAllValidations:
         session.set_result("orphan_count", [{"orphan_count": 0}])
         session.set_result("missing_count", [{"missing_count": 0}])
         session.set_result("industry_count", [{"industry_count": 50}])  # Too many
-        session.set_result("total_articles", [{"total_articles": 103, "chapters_with_articles": 15}])
+        session.set_result(
+            "total_articles", [{"total_articles": 103, "chapters_with_articles": 15}]
+        )
         session.set_default_result([])
         driver = MockDriver(session)
 
@@ -287,7 +295,10 @@ class TestValidationReporter:
                 "industry_count": 18,
                 "entity_stats": {"Concept": 100, "Industry": 18},
                 "invalid_patterns": [],
-                "article_coverage": {"total_articles": 103, "chapters_with_articles": 15},
+                "article_coverage": {
+                    "total_articles": 103,
+                    "chapters_with_articles": 15,
+                },
             },
             recommendations=["No issues found - graph looks healthy!"],
         )
@@ -321,7 +332,10 @@ class TestValidationReporter:
                 "industry_count": 50,
                 "entity_stats": {"Concept": 100},
                 "invalid_patterns": [],
-                "article_coverage": {"total_articles": 103, "chapters_with_articles": 15},
+                "article_coverage": {
+                    "total_articles": 103,
+                    "chapters_with_articles": 15,
+                },
             },
             recommendations=[
                 "Run chunk-article linking to connect 5 orphan chunks",

@@ -56,7 +56,9 @@ class ValidationReport:
         lines.append("|-------|--------|")
 
         for check, passed in self.summary.items():
-            status = "✅" if not passed else "❌"  # Note: summary flags are "has_X" so True = problem
+            status = (
+                "✅" if not passed else "❌"
+            )  # Note: summary flags are "has_X" so True = problem
             if check == "industry_count_ok":
                 status = "✅" if passed else "❌"  # This one is positive
             lines.append(f"| {check.replace('_', ' ').title()} | {status} |")
@@ -82,7 +84,9 @@ class ValidationReport:
         if self.details.get("orphan_chunks", 0) > 0:
             lines.append("### ⚠️ Orphan Chunks")
             lines.append("")
-            lines.append(f"Found **{self.details['orphan_chunks']}** chunks not connected to any article.")
+            lines.append(
+                f"Found **{self.details['orphan_chunks']}** chunks not connected to any article."
+            )
             lines.append("")
 
         # Duplicate entities
@@ -99,7 +103,9 @@ class ValidationReport:
         if self.details.get("missing_embeddings", 0) > 0:
             lines.append("### ⚠️ Missing Embeddings")
             lines.append("")
-            lines.append(f"Found **{self.details['missing_embeddings']}** chunks without embeddings.")
+            lines.append(
+                f"Found **{self.details['missing_embeddings']}** chunks without embeddings."
+            )
             lines.append("")
 
         # Industry count

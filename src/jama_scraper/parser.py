@@ -216,11 +216,13 @@ class HTMLParser:
                 )
 
                 if term and definition:
-                    terms.append({
-                        "term": term,
-                        "acronym": acronym if acronym else None,
-                        "definition": definition,
-                    })
+                    terms.append(
+                        {
+                            "term": term,
+                            "acronym": acronym if acronym else None,
+                            "definition": definition,
+                        }
+                    )
 
         # Strategy 2: Definition lists
         if not terms:

@@ -362,10 +362,12 @@ async def process_guide_with_pipeline(
                     stats["succeeded"] += 1
                 else:
                     stats["failed"] += 1
-                    stats["errors"].append({
-                        "article_id": article.article_id,
-                        "error": result.get("error", "Unknown error"),
-                    })
+                    stats["errors"].append(
+                        {
+                            "article_id": article.article_id,
+                            "error": result.get("error", "Unknown error"),
+                        }
+                    )
 
                 logger.info(
                     "Article processed",

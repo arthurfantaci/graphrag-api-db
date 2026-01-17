@@ -495,7 +495,7 @@ async def run_scraper(
     console.print("\n[bold green]✓ Pipeline complete![/]")
     console.print(f"  Articles processed: {pipeline_stats.get('processed', 0)}")
     console.print(f"  Succeeded: {pipeline_stats.get('succeeded', 0)}")
-    if pipeline_stats.get('failed', 0) > 0:
+    if pipeline_stats.get("failed", 0) > 0:
         console.print(f"  [red]Failed: {pipeline_stats.get('failed', 0)}[/]")
 
     return guide

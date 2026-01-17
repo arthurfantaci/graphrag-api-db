@@ -219,7 +219,8 @@ def create_extraction_template() -> ERExtractionTemplate:
 
     # Template must include the required JSON output format from neo4j_graphrag
     # plus our domain-specific instructions
-    custom_template = """You are a top-tier algorithm designed for extracting
+    custom_template = (
+        """You are a top-tier algorithm designed for extracting
 information in structured formats to build a knowledge graph.
 
 Extract the entities (nodes) and specify their type from the following text.
@@ -242,11 +243,14 @@ Make sure you adhere to the following rules to produce valid JSON objects:
 - The JSON object must not wrapped into a list - it is its own JSON object.
 - Property names must be enclosed in double quotes
 
-""" + REQUIREMENTS_DOMAIN_INSTRUCTIONS + """
+"""
+        + REQUIREMENTS_DOMAIN_INSTRUCTIONS
+        + """
 
 Input text:
 
 {text}"""
+    )
 
     return ERExtractionTemplate(template=custom_template)
 
