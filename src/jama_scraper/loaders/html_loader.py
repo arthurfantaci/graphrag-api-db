@@ -72,16 +72,20 @@ class JamaHTMLLoader:
 
         # Check if source is an article_id
         if isinstance(source, str) and source in self.article_index:
+            from neo4j_graphrag.experimental.components.types import DocumentInfo
+
             article = self.article_index[source]
             return PdfDocument(
                 text=article.get("markdown_content", ""),
-                metadata={
-                    "article_id": source,
-                    "title": article.get("title", ""),
-                    "url": article.get("url", ""),
-                    "chapter_number": article.get("chapter_number", 0),
-                    "source_type": "article_index",
-                },
+                document_info=DocumentInfo(
+                    path=article.get("url", source),
+                    metadata={
+                        "article_id": source,
+                        "title": article.get("title", ""),
+                        "chapter_number": str(article.get("chapter_number", 0)),
+                        "source_type": "article_index",
+                    },
+                ),
             )
 
         # Check if source is a file path
@@ -102,13 +106,17 @@ class JamaHTMLLoader:
             msg = f"Unsupported file type: {suffix}"
             raise ValueError(msg)
 
+        from neo4j_graphrag.experimental.components.types import DocumentInfo
+
         return PdfDocument(
             text=content,
-            metadata={
-                "filepath": str(filepath),
-                "filename": filepath.name,
-                "source_type": "file",
-            },
+            document_info=DocumentInfo(
+                path=str(filepath),
+                metadata={
+                    "filename": filepath.name,
+                    "source_type": "file",
+                },
+            ),
         )
 
     async def _load_html(self, filepath: Path) -> str:
@@ -225,19 +233,23 @@ class JamaHTMLLoader:
 
         documents = []
 
+        from neo4j_graphrag.experimental.components.types import DocumentInfo
+
         for chapter in guide.chapters:
             for article in chapter.articles:
                 doc = PdfDocument(
                     text=article.markdown_content,
-                    metadata={
-                        "article_id": article.article_id,
-                        "title": article.title,
-                        "url": article.url,
-                        "chapter_number": chapter.chapter_number,
-                        "chapter_title": chapter.title,
-                        "article_number": article.article_number,
-                        "content_type": article.content_type.value,
-                    },
+                    document_info=DocumentInfo(
+                        path=article.url,
+                        metadata={
+                            "article_id": article.article_id,
+                            "title": article.title,
+                            "chapter_number": str(chapter.chapter_number),
+                            "chapter_title": chapter.title,
+                            "article_number": str(article.article_number),
+                            "content_type": article.content_type.value,
+                        },
+                    ),
                 )
                 documents.append(doc)
 
