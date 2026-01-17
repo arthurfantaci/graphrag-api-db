@@ -155,26 +155,8 @@ ignore = [
 # Fetcher uses try/return pattern and lazy imports for optional dependencies
 "**/fetcher.py" = ["TRY300", "PLC0415"]
 
-# Extraction schemas use lazy imports for optional langextract dependency
-"**/extraction_schemas.py" = ["PLC0415"]
-
-# Extractor uses lazy imports for optional langextract dependency
-"**/extractor.py" = ["PLC0415"]
-
 # CLI has many branches, statements, and lazy imports for optional features
 "**/cli.py" = ["PLR0912", "PLR0915", "PLC0415", "TRY300", "TRY301"]
-
-# Chunker and embedder use lazy imports for optional dependencies
-"**/chunker.py" = ["PLC0415"]
-"**/embedder.py" = ["PLC0415", "TC001"]
-"**/text_utils.py" = ["PLC0415", "ANN401"]
-
-# Export uses Path at runtime, not just for type hints
-"**/chunk_export.py" = ["TC003"]
-
-# Config files use **kwargs to absorb extra CLI arguments
-"**/chunking_config.py" = ["ANN401"]
-"**/embedding_config.py" = ["ANN401"]
 
 # Config contains long article titles/URLs that shouldn't be wrapped
 "**/config.py" = ["E501"]
@@ -182,14 +164,11 @@ ignore = [
 # Package init uses categorized __all__ for readability over alphabetical sorting
 "**/__init__.py" = ["RUF022"]
 
-# Neo4j loader has many statements for orchestration and uses neo4j driver types
-"**/neo4j_loader.py" = ["PLR0915", "PLR0913", "ANN401"]
-
 # New pipeline modules use lazy imports and have complex orchestration
 "**/extraction/pipeline.py" = ["PLC0415", "PLR0913", "TRY300", "TRY400"]
 "**/extraction/schema.py" = ["E501"]  # Long description strings
 "**/extraction/prompts.py" = ["E501", "PLC0415"]  # Long prompt strings
-"**/postprocessing/*.py" = ["PLC0415", "E501", "RET504"]  # Cypher queries can be long
+"**/postprocessing/*.py" = ["PLC0415", "E501", "RET504", "PLR0911", "PLR0912", "PLR0915", "PLR2004", "TRY400"]  # Cypher queries, complex taxonomy logic
 "**/graph/*.py" = ["PLC0415", "PLR0915", "ANN401", "SIM102"]
 "**/validation/*.py" = ["PLC0415", "E501", "PLR2004", "PLR0912", "PLR0915", "RET504"]
 "**/loaders/*.py" = ["PLC0415", "ANN401", "RET504"]

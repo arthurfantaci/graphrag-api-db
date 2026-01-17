@@ -157,26 +157,18 @@ class ValidationQueries:
     async def find_invalid_patterns(self) -> list[dict]:
         """Find relationships that don't match defined patterns.
 
+        Uses the actual PATTERNS from the extraction schema to ensure
+        we don't report false positives.
+
         Returns:
             List of invalid relationship patterns.
         """
-        # Define valid patterns from schema
-        valid_patterns = [
-            ("Concept", "ADDRESSES", "Challenge"),
-            ("Bestpractice", "ADDRESSES", "Challenge"),
-            ("Tool", "ADDRESSES", "Challenge"),
-            ("Methodology", "ADDRESSES", "Challenge"),
-            ("Concept", "REQUIRES", "Concept"),
-            ("Concept", "REQUIRES", "Artifact"),
-            ("Standard", "APPLIES_TO", "Industry"),
-            ("Methodology", "APPLIES_TO", "Industry"),
-            ("Processstage", "PRODUCES", "Artifact"),
-            ("Role", "PRODUCES", "Artifact"),
-        ]
+        # Import the actual valid patterns from schema
+        from jama_scraper.extraction.schema import PATTERNS
 
-        # Build exclusion condition
+        # Build exclusion condition from all valid patterns
         exclusions = []
-        for source, rel, target in valid_patterns:
+        for source, rel, target in PATTERNS:
             exclusions.append(
                 f"(labels(a)[0] = '{source}' AND type(r) = '{rel}' AND labels(b)[0] = '{target}')"
             )
