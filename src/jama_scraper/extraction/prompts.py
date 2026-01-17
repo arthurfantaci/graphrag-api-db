@@ -141,9 +141,9 @@ INCORRECT extraction:
 - (software development)-[USED_BY]->(word)   ← WRONG DIRECTION!
 
 CORRECT extraction:
-- Entity: Tool { name: "excel" }
-- Entity: Tool { name: "word" }
-- Entity: Concept { name: "requirements management" }
+- Entity: Tool (name: "excel")
+- Entity: Tool (name: "word")
+- Entity: Concept (name: "requirements management")
 - NO relationship between Concept and Tool (USED_BY is for Role/Industry → Tool)
 
 **Rule**: USED_BY relationships go FROM Role or Industry TO Tool, never from Concept.
@@ -155,7 +155,7 @@ CORRECT extraction:
 Text: "TÜV SÜD certified the product for functional safety compliance."
 
 INCORRECT extraction:
-- Entity: Standard { name: "tüv süd" }  ← WRONG! TÜV SÜD is an organization
+- Entity: Standard (name: "tüv süd")  ← WRONG! TÜV SÜD is an organization
 
 CORRECT extraction:
 - Do NOT create an entity for TÜV SÜD (it's a certification body, not a standard)
@@ -176,8 +176,8 @@ INCORRECT extraction:
 - (iso/iec 12207)-[APPLIES_TO]->(systems and software engineering)  ← WRONG!
 
 CORRECT extraction:
-- Entity: Standard { name: "iso/iec 12207", organization: "ISO/IEC" }
-- Entity: Concept { name: "software lifecycle", definition: "..." }
+- Entity: Standard (name: "iso/iec 12207", organization: "ISO/IEC")
+- Entity: Concept (name: "software lifecycle", definition: "...")
 - Relationship: (iso/iec 12207)-[DEFINES]->(software lifecycle)
 
 **Rule**: Standards APPLY_TO Industries (vertical markets), not Concepts.

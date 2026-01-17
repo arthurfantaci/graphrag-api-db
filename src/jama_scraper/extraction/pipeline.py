@@ -198,10 +198,14 @@ def create_jama_kg_pipeline(
     # Create Neo4j driver
     driver = create_neo4j_driver(config)
 
-    # Create LLM for extraction
+    # Create LLM for extraction with JSON response format
     llm = OpenAILLM(
         model_name=config.llm_model,
         api_key=config.openai_api_key,
+        model_params={
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+        },
     )
 
     # Create embeddings
@@ -219,7 +223,7 @@ def create_jama_kg_pipeline(
     # Create extraction template with domain instructions
     prompt_template = create_extraction_template()
 
-    # Get schema
+    # Get schema formatted for SimpleKGPipeline
     schema = get_schema_for_pipeline()
 
     # Create lexical graph configuration
@@ -234,20 +238,19 @@ def create_jama_kg_pipeline(
         node_to_chunk_relationship_type=config.node_to_chunk_relationship,
     )
 
-    # Create the pipeline
+    # Create the pipeline with schema parameter
     pipeline = SimpleKGPipeline(
         llm=llm,
         driver=driver,
         embedder=embedder,
         text_splitter=text_splitter,
         prompt_template=prompt_template,
-        entities=schema["entities"],
-        relations=schema["relations"],
-        potential_schema=schema["potential_schema"],
+        schema=schema,
         lexical_graph_config=lexical_config,
         perform_entity_resolution=config.perform_entity_resolution,
         neo4j_database=config.neo4j_database,
         from_pdf=False,  # We're passing text directly, not PDF files
+        on_error="IGNORE",  # Continue processing even if individual chunks fail
     )
 
     logger.info("Pipeline created successfully")
@@ -290,11 +293,21 @@ async def process_article_with_pipeline(
         }
 
     except Exception as e:
-        logger.error("Failed to process article", article_id=article_id, error=str(e))
+        import traceback
+
+        tb = traceback.format_exc()
+        logger.error(
+            "Failed to process article",
+            article_id=article_id,
+            error=str(e),
+            error_type=type(e).__name__,
+            traceback=tb,
+        )
         return {
             "article_id": article_id,
             "status": "error",
             "error": str(e),
+            "traceback": tb,
         }
 
 

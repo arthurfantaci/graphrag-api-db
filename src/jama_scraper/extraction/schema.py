@@ -449,51 +449,58 @@ def get_schema_for_pipeline() -> dict[str, Any]:
     """Get schema formatted for neo4j_graphrag SimpleKGPipeline.
 
     Returns:
-        Dictionary with 'entities' and 'relations' keys in the format
-        expected by neo4j_graphrag's schema parameter.
+        Dictionary with 'node_types', 'relationship_types', and 'patterns' keys
+        in the format expected by neo4j_graphrag's schema parameter.
 
     Example:
         >>> schema = get_schema_for_pipeline()
         >>> pipeline = SimpleKGPipeline(..., schema=schema)
     """
-    # Format entities for neo4j_graphrag
-    entities = []
+    # Format node_types for neo4j_graphrag
+    # Can be simple strings or dicts with label, description, properties
+    node_types = []
     for label, config in NODE_TYPES.items():
-        entity_def = {
+        node_def = {
             "label": label,
             "description": config["description"],
             "properties": [
                 {
                     "name": prop_name,
                     "type": prop_config["type"],
-                    "description": prop_config.get("description", ""),
                 }
                 for prop_name, prop_config in config["properties"].items()
             ],
         }
-        entities.append(entity_def)
+        node_types.append(node_def)
 
-    # Format relations for neo4j_graphrag
-    relations = []
+    # Format relationship_types for neo4j_graphrag
+    relationship_types = []
     for rel_type, config in RELATIONSHIP_TYPES.items():
-        relation_def = {
-            "label": rel_type,
-            "description": config["description"],
-            "properties": [
-                {
-                    "name": prop_name,
-                    "type": prop_config["type"],
-                    "description": prop_config.get("description", ""),
-                }
-                for prop_name, prop_config in config.get("properties", {}).items()
-            ],
-        }
-        relations.append(relation_def)
+        rel_props = config.get("properties", {})
+        if rel_props:
+            rel_def = {
+                "label": rel_type,
+                "description": config["description"],
+                "properties": [
+                    {
+                        "name": prop_name,
+                        "type": prop_config["type"],
+                    }
+                    for prop_name, prop_config in rel_props.items()
+                ],
+            }
+        else:
+            # Simple relationship with just label and description
+            rel_def = {
+                "label": rel_type,
+                "description": config["description"],
+            }
+        relationship_types.append(rel_def)
 
     return {
-        "entities": entities,
-        "relations": relations,
-        "potential_schema": PATTERNS,
+        "node_types": node_types,
+        "relationship_types": relationship_types,
+        "patterns": PATTERNS,
     }
 
 
