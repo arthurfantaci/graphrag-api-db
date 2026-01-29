@@ -340,7 +340,9 @@ def format_fix_preview(preview: dict[str, Any]) -> str:
         lines.append("Generic entities to delete:")
         for entity in preview["generic_entities"]["entities"][:10]:
             rels = entity.get("relationship_count", 0)
-            lines.append(f"  - {entity['label']}: {entity['name']} ({rels} relationships)")
+            lines.append(
+                f"  - {entity['label']}: {entity['name']} ({rels} relationships)"
+            )
         if preview["generic_entities"]["would_delete"] > 10:
             remaining = preview["generic_entities"]["would_delete"] - 10
             lines.append(f"  ... and {remaining} more")

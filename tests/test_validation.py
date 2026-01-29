@@ -49,7 +49,9 @@ class TestEntityCleanupTaxonomy:
         assert normalize_to_singular("stakeholders") == "stakeholder"
         assert normalize_to_singular("artifacts") == "artifact"
         assert normalize_to_singular("constraints") == "constraint"
-        assert normalize_to_singular("REQUIREMENTS") == "requirement"  # Case insensitive
+        assert (
+            normalize_to_singular("REQUIREMENTS") == "requirement"
+        )  # Case insensitive
 
     def test_normalize_to_singular_preserves_singulars(self) -> None:
         """Test that singular terms are not changed."""
@@ -160,7 +162,11 @@ class TestValidateExtractedEntities:
         from graphrag_kg_pipeline.extraction.pipeline import validate_extracted_entities
 
         entities = [
-            {"name": "requirements", "label": "Concept", "display_name": "Requirements"},
+            {
+                "name": "requirements",
+                "label": "Concept",
+                "display_name": "Requirements",
+            },
             {"name": "stakeholders", "label": "Role"},
         ]
 
@@ -701,8 +707,12 @@ class TestRunAllValidationsWithNewChecks:
         session.set_result("orphan_count", [{"orphan_count": 0}])
         # Note: "missing_count" matches both missing embeddings and missing chunk_ids
         # So we need to use a more specific pattern for chunk_id query
-        session.set_result("c.embedding IS NULL", [{"missing_count": 0}])  # Embeddings OK
-        session.set_result("c.chunk_id IS NULL", [{"missing_count": 2159}])  # Chunk IDs missing!
+        session.set_result(
+            "c.embedding IS NULL", [{"missing_count": 0}]
+        )  # Embeddings OK
+        session.set_result(
+            "c.chunk_id IS NULL", [{"missing_count": 2159}]
+        )  # Chunk IDs missing!
         session.set_result("industry_count", [{"industry_count": 15}])
         session.set_result(
             "total_articles", [{"total_articles": 103, "chapters_with_articles": 15}]
@@ -761,7 +771,12 @@ class TestValidationFixes:
             "plural_entities": {
                 "would_merge": 10,
                 "entities": [
-                    {"label": "Concept", "name": "requirements", "normalized_name": "requirement", "relationship_count": 45},
+                    {
+                        "label": "Concept",
+                        "name": "requirements",
+                        "normalized_name": "requirement",
+                        "relationship_count": 45,
+                    },
                 ],
             },
         }

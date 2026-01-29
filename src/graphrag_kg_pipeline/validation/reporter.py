@@ -143,7 +143,9 @@ class ValidationReport:
                 remaining = len(self.details["plural_singular_duplicates"]) - 15
                 lines.append(f"| ... | {remaining} more pairs | ... | ... | ... |")
             lines.append("")
-            lines.append("Run `graphrag-kg validate --fix` to merge plurals into singulars.")
+            lines.append(
+                "Run `graphrag-kg validate --fix` to merge plurals into singulars."
+            )
             lines.append("")
 
         # Generic entities
@@ -258,7 +260,9 @@ class ValidationReporter:
                 "article_coverage": results["article_coverage"],
                 # New details
                 "missing_chunk_ids": results.get("missing_chunk_ids", 0),
-                "plural_singular_duplicates": results.get("plural_singular_duplicates", []),
+                "plural_singular_duplicates": results.get(
+                    "plural_singular_duplicates", []
+                ),
                 "generic_entities": results.get("generic_entities", []),
             },
             recommendations=self._generate_recommendations(results),

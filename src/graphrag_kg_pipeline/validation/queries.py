@@ -392,7 +392,9 @@ class ValidationQueries:
 
         async with self.driver.session(database=self.database) as session:
             result = await session.run(query)
-            return {record["name"]: record["relationship_count"] async for record in result}
+            return {
+                record["name"]: record["relationship_count"] async for record in result
+            }
 
     async def get_chunk_article_mapping(self, limit: int = 100) -> list[dict]:
         """Get chunk to article mapping for chunk_id generation.
