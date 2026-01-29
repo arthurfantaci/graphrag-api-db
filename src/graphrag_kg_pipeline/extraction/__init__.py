@@ -6,18 +6,18 @@ This package provides:
 - SimpleKGPipeline factory and configuration
 """
 
-from jama_scraper.extraction.pipeline import (
+from graphrag_kg_pipeline.extraction.pipeline import (
     JamaKGPipelineConfig,
     create_async_neo4j_driver,
     create_jama_kg_pipeline,
     create_neo4j_driver,
     process_guide_with_pipeline,
 )
-from jama_scraper.extraction.prompts import (
+from graphrag_kg_pipeline.extraction.prompts import (
     REQUIREMENTS_DOMAIN_INSTRUCTIONS,
     create_extraction_template,
 )
-from jama_scraper.extraction.schema import (
+from graphrag_kg_pipeline.extraction.schema import (
     NODE_TYPES,
     PATTERNS,
     RELATIONSHIP_TYPES,

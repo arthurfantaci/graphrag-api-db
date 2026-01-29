@@ -5,12 +5,12 @@ This package provides:
 - Database constraints and indexes
 """
 
-from jama_scraper.graph.constraints import (
+from graphrag_kg_pipeline.graph.constraints import (
     ConstraintManager,
     create_all_constraints,
     create_vector_index,
 )
-from jama_scraper.graph.supplementary import (
+from graphrag_kg_pipeline.graph.supplementary import (
     SupplementaryGraphBuilder,
     create_article_relationships,
     create_chapter_structure,

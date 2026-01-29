@@ -10,7 +10,7 @@ within size limits for embedding and LLM context windows.
 
 from typing import TYPE_CHECKING
 
-from jama_scraper.chunking.config import HierarchicalChunkingConfig
+from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document

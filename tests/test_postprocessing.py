@@ -12,14 +12,18 @@ class TestIndustryTaxonomy:
 
     def test_industry_taxonomy_defined(self) -> None:
         """Test that industry taxonomy mapping is defined."""
-        from jama_scraper.postprocessing.industry_taxonomy import INDUSTRY_TAXONOMY
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            INDUSTRY_TAXONOMY,
+        )
 
         assert isinstance(INDUSTRY_TAXONOMY, dict)
         assert len(INDUSTRY_TAXONOMY) > 0
 
     def test_industry_taxonomy_has_canonical_names(self) -> None:
         """Test that taxonomy maps to canonical industry names."""
-        from jama_scraper.postprocessing.industry_taxonomy import INDUSTRY_TAXONOMY
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            INDUSTRY_TAXONOMY,
+        )
 
         # Check some expected canonical industries
         canonical_values = set(INDUSTRY_TAXONOMY.values())
@@ -37,7 +41,9 @@ class TestIndustryTaxonomy:
 
     def test_industry_taxonomy_covers_variants(self) -> None:
         """Test that taxonomy covers common variants."""
-        from jama_scraper.postprocessing.industry_taxonomy import INDUSTRY_TAXONOMY
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            INDUSTRY_TAXONOMY,
+        )
 
         # These variants should map to canonical names
         variant_mappings = [
@@ -53,7 +59,7 @@ class TestIndustryTaxonomy:
 
     def test_concepts_not_industries_defined(self) -> None:
         """Test that concepts-not-industries set is defined."""
-        from jama_scraper.postprocessing.industry_taxonomy import (
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
             CONCEPTS_NOT_INDUSTRIES,
         )
 
@@ -62,7 +68,7 @@ class TestIndustryTaxonomy:
 
     def test_concepts_not_industries_contents(self) -> None:
         """Test that technology concepts are in the exclusion set."""
-        from jama_scraper.postprocessing.industry_taxonomy import (
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
             CONCEPTS_NOT_INDUSTRIES,
         )
 
@@ -79,7 +85,7 @@ class TestIndustryTaxonomy:
 
     def test_generic_terms_to_delete_defined(self) -> None:
         """Test that generic terms set is defined."""
-        from jama_scraper.postprocessing.industry_taxonomy import (
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
             GENERIC_TERMS_TO_DELETE,
         )
 
@@ -88,7 +94,7 @@ class TestIndustryTaxonomy:
 
     def test_generic_terms_contents(self) -> None:
         """Test that vague terms are in deletion set."""
-        from jama_scraper.postprocessing.industry_taxonomy import (
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
             GENERIC_TERMS_TO_DELETE,
         )
 
@@ -103,7 +109,9 @@ class TestClassifyIndustryTerm:
 
     def test_classify_valid_industry(self) -> None:
         """Test classification of valid industry names."""
-        from jama_scraper.postprocessing.industry_taxonomy import classify_industry_term
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            classify_industry_term,
+        )
 
         action, value = classify_industry_term("automotive")
         assert action == "keep"
@@ -111,7 +119,9 @@ class TestClassifyIndustryTerm:
 
     def test_classify_industry_variant(self) -> None:
         """Test classification of industry variants."""
-        from jama_scraper.postprocessing.industry_taxonomy import classify_industry_term
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            classify_industry_term,
+        )
 
         # "auto industry" is a variant that maps to "automotive"
         action, value = classify_industry_term("auto industry")
@@ -120,7 +130,9 @@ class TestClassifyIndustryTerm:
 
     def test_classify_concept_reclassification(self) -> None:
         """Test that technology concepts are marked for reclassification."""
-        from jama_scraper.postprocessing.industry_taxonomy import classify_industry_term
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            classify_industry_term,
+        )
 
         action, value = classify_industry_term("artificial intelligence")
         assert action == "reclassify"
@@ -128,7 +140,9 @@ class TestClassifyIndustryTerm:
 
     def test_classify_generic_deletion(self) -> None:
         """Test that generic terms are marked for deletion."""
-        from jama_scraper.postprocessing.industry_taxonomy import classify_industry_term
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            classify_industry_term,
+        )
 
         action, value = classify_industry_term("industry")
         assert action == "delete"
@@ -136,7 +150,9 @@ class TestClassifyIndustryTerm:
 
     def test_classify_unknown_term(self) -> None:
         """Test classification of unknown terms."""
-        from jama_scraper.postprocessing.industry_taxonomy import classify_industry_term
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            classify_industry_term,
+        )
 
         action, value = classify_industry_term("xyzzy_not_a_real_industry_12345")
         assert action == "unknown"
@@ -144,7 +160,9 @@ class TestClassifyIndustryTerm:
 
     def test_classify_case_insensitive(self) -> None:
         """Test that classification is case-insensitive."""
-        from jama_scraper.postprocessing.industry_taxonomy import classify_industry_term
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            classify_industry_term,
+        )
 
         # All these should normalize to the same result
         for variant in ["Automotive", "AUTOMOTIVE", "automotive"]:
@@ -158,14 +176,18 @@ class TestNormalizeIndustry:
 
     def test_normalize_exact_match(self) -> None:
         """Test normalization with exact match."""
-        from jama_scraper.postprocessing.industry_taxonomy import normalize_industry
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            normalize_industry,
+        )
 
         result = normalize_industry("automotive")
         assert result == "automotive"
 
     def test_normalize_fuzzy_match(self) -> None:
         """Test normalization with fuzzy matching."""
-        from jama_scraper.postprocessing.industry_taxonomy import normalize_industry
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            normalize_industry,
+        )
 
         # Should fuzzy match to "medical devices"
         result = normalize_industry("medical device")
@@ -173,7 +195,9 @@ class TestNormalizeIndustry:
 
     def test_normalize_returns_none_for_unknown(self) -> None:
         """Test that unknown industries return None."""
-        from jama_scraper.postprocessing.industry_taxonomy import normalize_industry
+        from graphrag_kg_pipeline.postprocessing.industry_taxonomy import (
+            normalize_industry,
+        )
 
         result = normalize_industry("not_an_industry_xyz")
         assert result is None
@@ -184,7 +208,7 @@ class TestEntityNormalizer:
 
     def test_normalizer_initialization(self) -> None:
         """Test that normalizer initializes with driver."""
-        from jama_scraper.postprocessing.normalizer import EntityNormalizer
+        from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
         from tests.conftest import MockDriver
 
         driver = MockDriver()
@@ -199,7 +223,9 @@ class TestGlossaryLinker:
 
     def test_glossary_linker_initialization(self) -> None:
         """Test that glossary linker initializes correctly."""
-        from jama_scraper.postprocessing.glossary_linker import GlossaryConceptLinker
+        from graphrag_kg_pipeline.postprocessing.glossary_linker import (
+            GlossaryConceptLinker,
+        )
         from tests.conftest import MockDriver
 
         driver = MockDriver()

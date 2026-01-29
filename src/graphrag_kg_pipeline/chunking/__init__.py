@@ -5,9 +5,9 @@ HTMLHeaderTextSplitter with fallback to RecursiveCharacterTextSplitter
 for large sections.
 """
 
-from jama_scraper.chunking.adapter import create_text_splitter_adapter
-from jama_scraper.chunking.config import HierarchicalChunkingConfig
-from jama_scraper.chunking.hierarchical_chunker import HierarchicalHTMLSplitter
+from graphrag_kg_pipeline.chunking.adapter import create_text_splitter_adapter
+from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
+from graphrag_kg_pipeline.chunking.hierarchical_chunker import HierarchicalHTMLSplitter
 
 __all__ = [
     "HierarchicalChunkingConfig",

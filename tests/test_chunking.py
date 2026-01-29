@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from jama_scraper.chunking.config import HierarchicalChunkingConfig
+from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
 
 
 class TestHierarchicalChunkingConfig:
@@ -58,7 +58,9 @@ class TestHierarchicalHTMLSplitter:
 
     def test_split_simple_html(self, sample_article_html_with_headers: str) -> None:
         """Test splitting HTML with multiple headers."""
-        from jama_scraper.chunking.hierarchical_chunker import HierarchicalHTMLSplitter
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
 
         config = HierarchicalChunkingConfig(
             sliding_window_size=512,
@@ -80,7 +82,9 @@ class TestHierarchicalHTMLSplitter:
         self, sample_article_html_with_headers: str
     ) -> None:
         """Test that split_text_as_documents returns Document objects."""
-        from jama_scraper.chunking.hierarchical_chunker import HierarchicalHTMLSplitter
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
 
         config = HierarchicalChunkingConfig()
         splitter = HierarchicalHTMLSplitter(config)
@@ -96,7 +100,9 @@ class TestHierarchicalHTMLSplitter:
 
     def test_large_section_splitting(self) -> None:
         """Test that large sections are further split by character splitter."""
-        from jama_scraper.chunking.hierarchical_chunker import HierarchicalHTMLSplitter
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
 
         # Create HTML with a very large section
         large_content = "This is test content. " * 500  # ~11000 characters
@@ -116,7 +122,9 @@ class TestHierarchicalHTMLSplitter:
 
     def test_empty_html(self) -> None:
         """Test handling of empty HTML."""
-        from jama_scraper.chunking.hierarchical_chunker import HierarchicalHTMLSplitter
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
 
         splitter = HierarchicalHTMLSplitter()
 
@@ -128,7 +136,9 @@ class TestHierarchicalHTMLSplitter:
 
     def test_split_with_positions(self, sample_article_html_with_headers: str) -> None:
         """Test that split_text_with_positions returns position tuples."""
-        from jama_scraper.chunking.hierarchical_chunker import HierarchicalHTMLSplitter
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
 
         splitter = HierarchicalHTMLSplitter()
 
@@ -147,7 +157,7 @@ class TestMarkdownSplitter:
 
     def test_split_markdown(self) -> None:
         """Test splitting markdown content."""
-        from jama_scraper.chunking.hierarchical_chunker import MarkdownSplitter
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import MarkdownSplitter
 
         markdown = """# Title
 
@@ -169,7 +179,7 @@ This is section two content with more text.
 
     def test_empty_markdown(self) -> None:
         """Test handling of empty markdown."""
-        from jama_scraper.chunking.hierarchical_chunker import MarkdownSplitter
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import MarkdownSplitter
 
         splitter = MarkdownSplitter()
         chunks = splitter.split_text("")
@@ -183,8 +193,8 @@ class TestTextSplitterAdapter:
 
     def test_create_adapter(self) -> None:
         """Test creating adapter from config."""
-        from jama_scraper.chunking.adapter import create_text_splitter_adapter
-        from jama_scraper.chunking.config import HierarchicalChunkingConfig
+        from graphrag_kg_pipeline.chunking.adapter import create_text_splitter_adapter
+        from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
 
         config = HierarchicalChunkingConfig()
         adapter = create_text_splitter_adapter(config)
@@ -193,8 +203,8 @@ class TestTextSplitterAdapter:
 
     def test_adapter_has_splitter(self) -> None:
         """Test that adapter wraps a splitter correctly."""
-        from jama_scraper.chunking.adapter import create_text_splitter_adapter
-        from jama_scraper.chunking.config import HierarchicalChunkingConfig
+        from graphrag_kg_pipeline.chunking.adapter import create_text_splitter_adapter
+        from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
 
         config = HierarchicalChunkingConfig()
         adapter = create_text_splitter_adapter(config)

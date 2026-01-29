@@ -12,7 +12,10 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
-    from neo4j import Driver
+    from neo4j import AsyncDriver, Driver
+
+    # Accept either sync or async driver
+    AnyDriver = Driver | AsyncDriver
 
 logger = structlog.get_logger(__name__)
 
@@ -108,6 +111,65 @@ class ValidationReport:
             )
             lines.append("")
 
+        # Missing chunk_ids
+        if self.details.get("missing_chunk_ids", 0) > 0:
+            lines.append("### ⚠️ Missing Chunk IDs")
+            lines.append("")
+            lines.append(
+                f"Found **{self.details['missing_chunk_ids']}** chunks without chunk_id property."
+            )
+            lines.append("")
+            lines.append("Run `graphrag-kg validate --fix` to generate chunk_ids.")
+            lines.append("")
+
+        # Plural/singular duplicates
+        if self.details.get("plural_singular_duplicates"):
+            lines.append("### ⚠️ Plural/Singular Duplicates")
+            lines.append("")
+            lines.append(
+                "Found entity pairs that differ only by plural suffix "
+                "(e.g., 'requirement' vs 'requirements'):"
+            )
+            lines.append("")
+            lines.append("| Label | Singular | Plural | Singular Rels | Plural Rels |")
+            lines.append("|-------|----------|--------|---------------|-------------|")
+            for dup in self.details["plural_singular_duplicates"][:15]:
+                lines.append(
+                    f"| {dup['label']} | {dup['singular_name']} | "
+                    f"{dup['plural_name']} | {dup['singular_rels']} | "
+                    f"{dup['plural_rels']} |"
+                )
+            if len(self.details["plural_singular_duplicates"]) > 15:
+                remaining = len(self.details["plural_singular_duplicates"]) - 15
+                lines.append(f"| ... | {remaining} more pairs | ... | ... | ... |")
+            lines.append("")
+            lines.append(
+                "Run `graphrag-kg validate --fix` to merge plurals into singulars."
+            )
+            lines.append("")
+
+        # Generic entities
+        if self.details.get("generic_entities"):
+            lines.append("### ⚠️ Generic Entities")
+            lines.append("")
+            lines.append(
+                "Found overly generic entity names that provide no semantic value:"
+            )
+            lines.append("")
+            lines.append("| Label | Name | Relationships |")
+            lines.append("|-------|------|---------------|")
+            for entity in self.details["generic_entities"][:15]:
+                lines.append(
+                    f"| {entity['label']} | {entity['name']} | "
+                    f"{entity['relationship_count']} |"
+                )
+            if len(self.details["generic_entities"]) > 15:
+                remaining = len(self.details["generic_entities"]) - 15
+                lines.append(f"| ... | {remaining} more | ... |")
+            lines.append("")
+            lines.append("Run `graphrag-kg validate --fix` to remove generic entities.")
+            lines.append("")
+
         # Industry count
         lines.append("### Industry Count")
         lines.append("")
@@ -162,7 +224,7 @@ class ValidationReporter:
         >>> report.save(Path("validation_report.md"))
     """
 
-    def __init__(self, driver: "Driver", database: str = "neo4j") -> None:
+    def __init__(self, driver: "AnyDriver", database: str = "neo4j") -> None:
         """Initialize the reporter.
 
         Args:
@@ -178,7 +240,7 @@ class ValidationReporter:
         Returns:
             ValidationReport with all findings.
         """
-        from jama_scraper.validation.queries import run_all_validations
+        from graphrag_kg_pipeline.validation.queries import run_all_validations
 
         # Run all validations
         results = await run_all_validations(self.driver, self.database)
@@ -196,6 +258,12 @@ class ValidationReporter:
                 "entity_stats": results["entity_stats"],
                 "invalid_patterns": results["invalid_patterns"],
                 "article_coverage": results["article_coverage"],
+                # New details
+                "missing_chunk_ids": results.get("missing_chunk_ids", 0),
+                "plural_singular_duplicates": results.get(
+                    "plural_singular_duplicates", []
+                ),
+                "generic_entities": results.get("generic_entities", []),
             },
             recommendations=self._generate_recommendations(results),
         )
@@ -238,6 +306,24 @@ class ValidationReporter:
                 "Review and fix invalid relationship patterns (may indicate extraction issues)"
             )
 
+        # New recommendations for chunk_id and entity cleanup
+        if results.get("missing_chunk_ids", 0) > 0:
+            recommendations.append(
+                f"Run `graphrag-kg validate --fix` to generate {results['missing_chunk_ids']} missing chunk_ids"
+            )
+
+        plural_count = len(results.get("plural_singular_duplicates", []))
+        if plural_count > 0:
+            recommendations.append(
+                f"Run `graphrag-kg validate --fix` to merge {plural_count} plural/singular entity pairs"
+            )
+
+        generic_count = len(results.get("generic_entities", []))
+        if generic_count > 0:
+            recommendations.append(
+                f"Run `graphrag-kg validate --fix` to remove {generic_count} overly generic entities"
+            )
+
         if not recommendations:
             recommendations.append("No issues found - graph looks healthy!")
 
@@ -245,7 +331,7 @@ class ValidationReporter:
 
 
 async def generate_validation_report(
-    driver: "Driver",
+    driver: "AnyDriver",
     database: str = "neo4j",
     output_path: Path | None = None,
 ) -> ValidationReport:

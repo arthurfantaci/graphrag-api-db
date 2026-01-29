@@ -21,11 +21,11 @@ python run.py
 
 ### CLI Usage
 ```bash
-jama-scrape                           # Default: outputs JSON + JSONL
-jama-scrape -o ./data                 # Custom output directory
-jama-scrape -f json -f jsonl -f markdown  # Multiple formats
-jama-scrape --include-html            # Include raw HTML in output
-jama-scrape --browser                 # Use Playwright for JS-rendered content
+graphrag-kg                           # Default: outputs JSON + JSONL
+graphrag-kg -o ./data                 # Custom output directory
+graphrag-kg -f json -f jsonl -f markdown  # Multiple formats
+graphrag-kg --include-html            # Include raw HTML in output
+graphrag-kg --browser                 # Use Playwright for JS-rendered content
 ```
 
 ### Browser Mode (Playwright)
@@ -36,7 +36,7 @@ uv sync --group browser
 playwright install chromium
 
 # Run with browser mode (slower but captures dynamic content)
-jama-scrape --browser
+graphrag-kg --browser
 ```
 
 ### Development

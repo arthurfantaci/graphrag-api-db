@@ -6,10 +6,10 @@ This package contains:
 """
 
 # Re-export core models from the legacy models.py (in parent directory)
-# This allows both `from jama_scraper.models import Article` and
-# `from jama_scraper import Article` to work
+# This allows both `from graphrag_kg_pipeline.models import Article` and
+# `from graphrag_kg_pipeline import Article` to work
 # New resource models
-from jama_scraper.models.resource import (
+from graphrag_kg_pipeline.models.resource import (
     BaseResource,
     DefinitionResource,
     ExternalLinkResource,
@@ -18,7 +18,7 @@ from jama_scraper.models.resource import (
     VideoResource,
     WebinarResource,
 )
-from jama_scraper.models_core import (
+from graphrag_kg_pipeline.models_core import (
     Article,
     Chapter,
     ContentType,

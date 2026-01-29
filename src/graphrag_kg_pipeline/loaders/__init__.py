@@ -5,8 +5,8 @@ This package provides:
 - Article index building utilities
 """
 
-from jama_scraper.loaders.html_loader import JamaHTMLLoader
-from jama_scraper.loaders.index_builder import (
+from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
+from graphrag_kg_pipeline.loaders.index_builder import (
     ArticleIndex,
     build_article_index,
 )

@@ -1,4 +1,4 @@
-# Jama Requirements Management Guide Scraper
+# GraphRAG Knowledge Graph Pipeline
 
 A Python ETL pipeline that scrapes Jama Software's **"The Essential Guide to Requirements Management and Traceability"** and loads it into a Neo4j knowledge graph using the `neo4j_graphrag` library for GraphRAG retrieval.
 
@@ -60,7 +60,7 @@ A Python ETL pipeline that scrapes Jama Software's **"The Essential Guide to Req
 
 ```bash
 # Clone or copy the project
-cd jama-guide-scraper
+cd graphrag-kg-pipeline
 
 # Install dependencies
 uv sync
@@ -106,20 +106,27 @@ EMBEDDING_MODEL=text-embedding-3-small
 
 ```bash
 # Run the full pipeline: scrape → extract → load to Neo4j
-jama-scrape
+graphrag-kg
 
 # With validation report
-jama-scrape --validate
+graphrag-kg scrape --validate
 
 # Skip resource node creation (images, videos, webinars)
-jama-scrape --skip-resources
+graphrag-kg scrape --skip-resources
+
+# Validate the graph and generate report
+graphrag-kg validate
+
+# Preview and apply fixes for data quality issues
+graphrag-kg validate --fix --dry-run
+graphrag-kg validate --fix
 ```
 
 ### Programmatic Usage
 
 ```python
 import asyncio
-from jama_scraper import run_scraper
+from graphrag_kg_pipeline import run_scraper
 
 # Run the full ETL pipeline
 async def main():
@@ -135,8 +142,9 @@ asyncio.run(main())
 ### Running Validation Only
 
 ```python
+import asyncio
 from neo4j import GraphDatabase
-from jama_scraper.validation.queries import run_all_validations
+from graphrag_kg_pipeline.validation.queries import run_all_validations
 
 driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
 results = asyncio.run(run_all_validations(driver))
@@ -176,8 +184,8 @@ print(f"Validation passed: {results['validation_passed']}")
 ## Project Structure
 
 ```
-jama-guide-scraper/
-├── src/jama_scraper/
+graphrag-kg-pipeline/
+├── src/graphrag_kg_pipeline/
 │   ├── __init__.py           # Package exports
 │   ├── cli.py                # Command-line interface
 │   ├── scraper.py            # Async web scraper
@@ -198,6 +206,7 @@ jama-guide-scraper/
 │   │   └── index_builder.py  # Article index utilities
 │   ├── postprocessing/       # Entity normalization
 │   │   ├── industry_taxonomy.py  # 18 canonical industries
+│   │   ├── entity_cleanup.py # Plural/generic entity handling
 │   │   ├── normalizer.py     # Entity deduplication
 │   │   └── glossary_linker.py
 │   ├── graph/                # Neo4j supplementary
@@ -205,6 +214,7 @@ jama-guide-scraper/
 │   │   └── constraints.py    # Indexes and constraints
 │   └── validation/           # Quality checks
 │       ├── queries.py        # Validation Cypher
+│       ├── fixes.py          # Data repair utilities
 │       └── reporter.py       # Report generation
 ├── tests/                    # Comprehensive test suite
 │   ├── conftest.py           # Pytest fixtures
