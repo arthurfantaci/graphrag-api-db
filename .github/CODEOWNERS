@@ -1,0 +1,21 @@
+# CODEOWNERS - Automatically request reviews from code owners
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for all files
+* @arthurfantaci
+
+# Source code
+/src/ @arthurfantaci
+
+# Tests
+/tests/ @arthurfantaci
+
+# Infrastructure and CI/CD
+/.github/ @arthurfantaci
+/pyproject.toml @arthurfantaci
+
+# Documentation
+/*.md @arthurfantaci
+
+# Configuration
+/.vscode/ @arthurfantaci
