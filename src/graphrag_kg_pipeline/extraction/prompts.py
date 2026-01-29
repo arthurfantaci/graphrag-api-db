@@ -196,6 +196,31 @@ Use DEFINES when a standard defines or specifies a concept.
 5. **Include context**: Add definition/description properties when text provides them
 6. **Check relationship direction**: Always verify source→target matches allowed patterns
 
+## NORMALIZATION RULES (CRITICAL):
+
+### 1. Always Use SINGULAR Form
+- ✓ "requirement" (not "requirements")
+- ✓ "stakeholder" (not "stakeholders")
+- ✓ "artifact" (not "artifacts")
+- ✓ "constraint" (not "constraints")
+- ✓ "specification" (not "specifications")
+
+### 2. NEVER Extract These Generic Terms as Entities
+The following terms are too vague to be useful - DO NOT create entities for them:
+- Generic tools: "tool", "tools", "software", "solution", "platform", "system"
+- Generic processes: "method", "process", "approach", "technique", "procedure"
+- Generic documents: "document", "file", "report"
+- Generic people: "person", "user", "team", "member"
+- Generic abstractions: "thing", "item", "element", "component", "part", "type"
+
+### 3. Prefer Specific Over Generic
+- ✓ "requirements management tool" over "tool"
+- ✓ "traceability matrix" over "document"
+- ✓ "systems engineer" over "user"
+- ✓ "agile methodology" over "process"
+
+If a term is too generic to provide meaningful information, skip it entirely.
+
 """
 
 # =============================================================================

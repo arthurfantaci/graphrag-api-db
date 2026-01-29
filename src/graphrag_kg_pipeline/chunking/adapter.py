@@ -6,8 +6,8 @@ our HierarchicalHTMLSplitter to neo4j_graphrag's expected interface.
 
 from typing import TYPE_CHECKING, Any
 
-from jama_scraper.chunking.config import HierarchicalChunkingConfig
-from jama_scraper.chunking.hierarchical_chunker import (
+from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
+from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
     HierarchicalHTMLSplitter,
     MarkdownSplitter,
 )
@@ -33,7 +33,7 @@ def create_text_splitter_adapter(
         A TextSplitter compatible with neo4j_graphrag pipelines.
 
     Example:
-        >>> from jama_scraper.chunking import create_text_splitter_adapter
+        >>> from graphrag_kg_pipeline.chunking import create_text_splitter_adapter
         >>> splitter = create_text_splitter_adapter(
         ...     HierarchicalChunkingConfig.for_rag()
         ... )

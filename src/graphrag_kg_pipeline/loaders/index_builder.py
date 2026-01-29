@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
-    from jama_scraper.models import RequirementsManagementGuide
+    from graphrag_kg_pipeline.models import RequirementsManagementGuide
 
 logger = structlog.get_logger(__name__)
 

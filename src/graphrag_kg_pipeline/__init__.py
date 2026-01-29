@@ -5,7 +5,7 @@ Requirements Management and Traceability" into a Neo4j knowledge graph
 using neo4j_graphrag's SimpleKGPipeline.
 
 Usage:
-    from jama_scraper import JamaGuideScraper, run_scraper
+    from graphrag_kg_pipeline import JamaGuideScraper, run_scraper
     import asyncio
 
     # Quick run (scrape + Neo4j pipeline)

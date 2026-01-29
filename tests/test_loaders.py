@@ -14,7 +14,7 @@ class TestArticleIndex:
 
     def test_article_index_creation(self) -> None:
         """Test creating an empty ArticleIndex."""
-        from jama_scraper.loaders.index_builder import ArticleIndex
+        from graphrag_kg_pipeline.loaders.index_builder import ArticleIndex
 
         index = ArticleIndex()
 
@@ -25,7 +25,7 @@ class TestArticleIndex:
 
     def test_article_index_get_article(self) -> None:
         """Test getting article by ID."""
-        from jama_scraper.loaders.index_builder import ArticleIndex
+        from graphrag_kg_pipeline.loaders.index_builder import ArticleIndex
 
         index = ArticleIndex()
         index.by_id["ch1-art1"] = {
@@ -42,7 +42,7 @@ class TestArticleIndex:
 
     def test_article_index_get_chapter_articles(self) -> None:
         """Test getting articles by chapter."""
-        from jama_scraper.loaders.index_builder import ArticleIndex
+        from graphrag_kg_pipeline.loaders.index_builder import ArticleIndex
 
         index = ArticleIndex()
         index.by_id["ch1-art1"] = {"title": "Article 1"}
@@ -57,7 +57,7 @@ class TestArticleIndex:
 
     def test_article_index_contains(self) -> None:
         """Test membership check."""
-        from jama_scraper.loaders.index_builder import ArticleIndex
+        from graphrag_kg_pipeline.loaders.index_builder import ArticleIndex
 
         index = ArticleIndex()
         index.by_id["ch1-art1"] = {"title": "Test"}
@@ -71,8 +71,8 @@ class TestBuildArticleIndex:
 
     def test_build_empty_guide(self) -> None:
         """Test building index from empty guide."""
-        from jama_scraper.loaders.index_builder import build_article_index
-        from jama_scraper.models_core import (
+        from graphrag_kg_pipeline.loaders.index_builder import build_article_index
+        from graphrag_kg_pipeline.models_core import (
             Glossary,
             GuideMetadata,
             RequirementsManagementGuide,
@@ -95,8 +95,8 @@ class TestBuildArticleIndex:
 
     def test_build_index_with_content_flag(self) -> None:
         """Test building index with include_content=False."""
-        from jama_scraper.loaders.index_builder import build_article_index
-        from jama_scraper.models_core import (
+        from graphrag_kg_pipeline.loaders.index_builder import build_article_index
+        from graphrag_kg_pipeline.models_core import (
             Article,
             Chapter,
             ContentType,
@@ -147,7 +147,7 @@ class TestJamaHTMLLoader:
 
     def test_loader_initialization(self) -> None:
         """Test that loader initializes correctly."""
-        from jama_scraper.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
 
         loader = JamaHTMLLoader()
         assert loader is not None
@@ -156,7 +156,7 @@ class TestJamaHTMLLoader:
 
     def test_loader_with_article_index(self) -> None:
         """Test loader initialization with article index."""
-        from jama_scraper.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
 
         index = {
             "ch1-art1": {
@@ -173,7 +173,7 @@ class TestJamaHTMLLoader:
 
     def test_loader_preprocess_flag(self) -> None:
         """Test loader with preprocess flag disabled."""
-        from jama_scraper.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
 
         loader = JamaHTMLLoader(preprocess_html=False)
         assert loader.preprocess_html is False
@@ -181,7 +181,7 @@ class TestJamaHTMLLoader:
     @pytest.mark.asyncio
     async def test_loader_run_with_article_id(self) -> None:
         """Test loading article by ID from index."""
-        from jama_scraper.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
 
         index = {
             "ch1-art1": {
@@ -203,7 +203,7 @@ class TestJamaHTMLLoader:
     @pytest.mark.asyncio
     async def test_loader_returns_metadata(self) -> None:
         """Test that loader returns document with metadata via document_info."""
-        from jama_scraper.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
 
         index = {
             "ch1-art1": {
@@ -226,7 +226,7 @@ class TestJamaHTMLLoader:
     @pytest.mark.asyncio
     async def test_loader_missing_article_raises(self) -> None:
         """Test that missing article raises error."""
-        from jama_scraper.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
 
         loader = JamaHTMLLoader(article_index={})
 
@@ -239,7 +239,7 @@ class TestComputeArticleStats:
 
     def test_compute_empty_stats(self) -> None:
         """Test computing stats from empty index."""
-        from jama_scraper.loaders.index_builder import (
+        from graphrag_kg_pipeline.loaders.index_builder import (
             ArticleIndex,
             compute_article_stats,
         )
@@ -252,7 +252,7 @@ class TestComputeArticleStats:
 
     def test_compute_stats_with_articles(self) -> None:
         """Test computing stats from populated index."""
-        from jama_scraper.loaders.index_builder import (
+        from graphrag_kg_pipeline.loaders.index_builder import (
             ArticleIndex,
             compute_article_stats,
         )

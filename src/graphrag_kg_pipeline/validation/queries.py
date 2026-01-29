@@ -9,9 +9,27 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
-    from neo4j import Driver
+    from neo4j import AsyncDriver, Driver
+
+    # Accept either sync or async driver
+    AnyDriver = Driver | AsyncDriver
 
 logger = structlog.get_logger(__name__)
+
+# Entity labels that are LLM-extracted and subject to cleanup
+# These are distinct from structural nodes (Article, Chunk, Definition, etc.)
+LLM_EXTRACTED_ENTITY_LABELS = [
+    "Concept",
+    "Challenge",
+    "Artifact",
+    "Bestpractice",
+    "Processstage",
+    "Role",
+    "Standard",
+    "Tool",
+    "Methodology",
+    "Industry",
+]
 
 
 class ValidationQueries:
@@ -29,7 +47,7 @@ class ValidationQueries:
         >>> print(f"Found {orphans} orphan chunks")
     """
 
-    def __init__(self, driver: "Driver", database: str = "neo4j") -> None:
+    def __init__(self, driver: "AnyDriver", database: str = "neo4j") -> None:
         """Initialize with Neo4j driver.
 
         Args:
@@ -164,7 +182,7 @@ class ValidationQueries:
             List of invalid relationship patterns.
         """
         # Import the actual valid patterns from schema
-        from jama_scraper.extraction.schema import PATTERNS
+        from graphrag_kg_pipeline.extraction.schema import PATTERNS
 
         # Build exclusion condition from all valid patterns
         exclusions = []
@@ -217,9 +235,194 @@ class ValidationQueries:
                 }
             return {"total_articles": 0, "chapters_with_articles": 0}
 
+    async def find_missing_chunk_ids(self) -> int:
+        """Find chunks without chunk_id property.
+
+        Returns:
+            Count of chunks missing chunk_id.
+        """
+        query = """
+        MATCH (c:Chunk)
+        WHERE c.chunk_id IS NULL
+        RETURN count(c) AS missing_count
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            record = await result.single()
+            return record["missing_count"] if record else 0
+
+    async def find_plural_singular_duplicates(
+        self,
+        labels: list[str] | None = None,
+    ) -> list[dict]:
+        """Find entity pairs that differ only by plural suffix.
+
+        Detects cases like "requirement" vs "requirements" that should
+        be merged. Only checks LLM-extracted entity labels by default.
+
+        Args:
+            labels: Entity labels to check. Defaults to LLM_EXTRACTED_ENTITY_LABELS.
+
+        Returns:
+            List of plural/singular pairs with relationship counts.
+        """
+        labels = labels or LLM_EXTRACTED_ENTITY_LABELS
+        label_list = "[" + ", ".join(f"'{lbl}'" for lbl in labels) + "]"
+
+        query = f"""
+        MATCH (singular)
+        WHERE any(label IN labels(singular) WHERE label IN {label_list})
+        AND singular.name IS NOT NULL
+        AND NOT singular.name ENDS WITH 's'
+
+        MATCH (plural)
+        WHERE any(label IN labels(plural) WHERE label IN {label_list})
+        AND plural.name = singular.name + 's'
+        AND labels(singular)[0] = labels(plural)[0]
+
+        // Count relationships for impact assessment
+        OPTIONAL MATCH (singular)-[r1]-()
+        OPTIONAL MATCH (plural)-[r2]-()
+
+        WITH singular, plural,
+             labels(singular)[0] AS label,
+             count(DISTINCT r1) AS singular_rels,
+             count(DISTINCT r2) AS plural_rels
+        RETURN label,
+               singular.name AS singular_name,
+               plural.name AS plural_name,
+               singular_rels,
+               plural_rels,
+               elementId(singular) AS singular_id,
+               elementId(plural) AS plural_id
+        ORDER BY label, singular_name
+        LIMIT 100
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            return [dict(record) async for record in result]
+
+    async def find_generic_entities(
+        self,
+        generic_terms: set[str] | None = None,
+        labels: list[str] | None = None,
+    ) -> list[dict]:
+        """Find overly generic entity names that should be removed.
+
+        Args:
+            generic_terms: Set of generic term names to find.
+                If None, uses a default set of common generic terms.
+            labels: Entity labels to check. Defaults to LLM_EXTRACTED_ENTITY_LABELS.
+
+        Returns:
+            List of generic entities with relationship counts.
+        """
+        # Default generic terms if none provided
+        if generic_terms is None:
+            generic_terms = {
+                "tool",
+                "tools",
+                "software",
+                "solution",
+                "solutions",
+                "platform",
+                "system",
+                "systems",
+                "method",
+                "methods",
+                "process",
+                "processes",
+                "approach",
+                "technique",
+                "techniques",
+                "document",
+                "documents",
+            }
+
+        labels = labels or LLM_EXTRACTED_ENTITY_LABELS
+        label_list = "[" + ", ".join(f"'{lbl}'" for lbl in labels) + "]"
+        term_list = "[" + ", ".join(f"'{term}'" for term in generic_terms) + "]"
+
+        query = f"""
+        MATCH (n)
+        WHERE any(label IN labels(n) WHERE label IN {label_list})
+        AND toLower(n.name) IN {term_list}
+
+        // Count relationships for impact assessment
+        OPTIONAL MATCH (n)-[r]-()
+        WITH n, labels(n)[0] AS label, count(DISTINCT r) AS relationship_count
+        RETURN label,
+               n.name AS name,
+               relationship_count,
+               elementId(n) AS element_id
+        ORDER BY relationship_count DESC, label, name
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            return [dict(record) async for record in result]
+
+    async def get_entity_relationship_counts(
+        self,
+        names: list[str],
+        label: str,
+    ) -> dict[str, int]:
+        """Get relationship counts for specific entities.
+
+        Useful for assessing impact before deletion or merge.
+
+        Args:
+            names: List of entity names to check.
+            label: Entity label to filter by.
+
+        Returns:
+            Mapping from entity name to relationship count.
+        """
+        name_list = "[" + ", ".join(f"'{n}'" for n in names) + "]"
+
+        query = f"""
+        MATCH (n:{label})
+        WHERE n.name IN {name_list}
+        OPTIONAL MATCH (n)-[r]-()
+        WITH n.name AS name, count(DISTINCT r) AS relationship_count
+        RETURN name, relationship_count
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            return {record["name"]: record["relationship_count"] async for record in result}
+
+    async def get_chunk_article_mapping(self, limit: int = 100) -> list[dict]:
+        """Get chunk to article mapping for chunk_id generation.
+
+        Returns chunks with their article_id and index for generating
+        chunk_id values.
+
+        Args:
+            limit: Maximum number of results to return.
+
+        Returns:
+            List of chunk/article mappings.
+        """
+        query = """
+        MATCH (c:Chunk)-[:FROM_ARTICLE]->(a:Article)
+        WHERE c.chunk_id IS NULL
+        RETURN elementId(c) AS chunk_element_id,
+               a.article_id AS article_id,
+               c.index AS chunk_index
+        ORDER BY a.article_id, c.index
+        LIMIT $limit
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query, limit=limit)
+            return [dict(record) async for record in result]
+
 
 async def run_all_validations(
-    driver: "Driver",
+    driver: "AnyDriver",
     database: str = "neo4j",
 ) -> dict[str, Any]:
     """Run all validation queries and return results.
@@ -242,6 +445,10 @@ async def run_all_validations(
         "entity_stats": await queries.get_entity_stats(),
         "invalid_patterns": await queries.find_invalid_patterns(),
         "article_coverage": await queries.check_article_coverage(),
+        # New checks for chunk_id and entity quality
+        "missing_chunk_ids": await queries.find_missing_chunk_ids(),
+        "plural_singular_duplicates": await queries.find_plural_singular_duplicates(),
+        "generic_entities": await queries.find_generic_entities(),
     }
 
     # Compute summary
@@ -252,14 +459,20 @@ async def run_all_validations(
         "has_missing_embeddings": results["missing_embeddings"] > 0,
         "industry_count_ok": results["industry_count"] <= 19,
         "has_invalid_patterns": len(results["invalid_patterns"]) > 0,
+        # New summary flags
+        "has_missing_chunk_ids": results["missing_chunk_ids"] > 0,
+        "has_plural_duplicates": len(results["plural_singular_duplicates"]) > 0,
+        "has_generic_entities": len(results["generic_entities"]) > 0,
     }
 
-    # Overall status
+    # Overall status - now includes chunk_id and plural duplicates
     results["validation_passed"] = all(
         [
             not results["summary"]["has_orphan_chunks"],
             not results["summary"]["has_duplicates"],
             results["summary"]["industry_count_ok"],
+            not results["summary"]["has_missing_chunk_ids"],
+            not results["summary"]["has_plural_duplicates"],
         ]
     )
 
@@ -269,6 +482,9 @@ async def run_all_validations(
         orphan_chunks=results["orphan_chunks"],
         duplicates=len(results["duplicate_entities"]),
         industries=results["industry_count"],
+        missing_chunk_ids=results["missing_chunk_ids"],
+        plural_duplicates=len(results["plural_singular_duplicates"]),
+        generic_entities=len(results["generic_entities"]),
     )
 
     return results

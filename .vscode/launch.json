@@ -12,14 +12,14 @@
       "justMyCode": true
     },
     {
-      "name": "Run: Scraper CLI",
+      "name": "Run: GraphRAG KG Pipeline CLI",
       "type": "debugpy",
       "request": "launch",
-      "module": "jama_scraper.cli",
+      "module": "graphrag_kg_pipeline.cli",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": { "PYTHONPATH": "${workspaceFolder}/src" },
-      "args": ["-f", "json", "-f", "jsonl"]
+      "args": []
     },
     {
       "name": "Run: run.py",

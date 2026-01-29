@@ -14,7 +14,7 @@ class TestExtractionSchema:
 
     def test_node_types_defined(self) -> None:
         """Test that all expected node types are defined."""
-        from jama_scraper.extraction.schema import NODE_TYPES
+        from graphrag_kg_pipeline.extraction.schema import NODE_TYPES
 
         expected_types = [
             "Concept",
@@ -35,7 +35,7 @@ class TestExtractionSchema:
 
     def test_node_types_have_required_fields(self) -> None:
         """Test that node types have label and description."""
-        from jama_scraper.extraction.schema import NODE_TYPES
+        from graphrag_kg_pipeline.extraction.schema import NODE_TYPES
 
         for label, node_type in NODE_TYPES.items():
             assert "label" in node_type, f"Node type {label} missing label"
@@ -44,7 +44,7 @@ class TestExtractionSchema:
 
     def test_node_types_have_name_property(self) -> None:
         """Test that all node types have a name property."""
-        from jama_scraper.extraction.schema import NODE_TYPES
+        from graphrag_kg_pipeline.extraction.schema import NODE_TYPES
 
         for label, node_type in NODE_TYPES.items():
             props = node_type["properties"]
@@ -52,7 +52,7 @@ class TestExtractionSchema:
 
     def test_relationship_types_defined(self) -> None:
         """Test that expected relationship types are defined."""
-        from jama_scraper.extraction.schema import RELATIONSHIP_TYPES
+        from graphrag_kg_pipeline.extraction.schema import RELATIONSHIP_TYPES
 
         expected_rels = [
             "ADDRESSES",
@@ -75,7 +75,7 @@ class TestExtractionSchema:
 
     def test_patterns_are_valid_triples(self) -> None:
         """Test that patterns are valid (source, rel, target) triples."""
-        from jama_scraper.extraction.schema import (
+        from graphrag_kg_pipeline.extraction.schema import (
             NODE_TYPES,
             PATTERNS,
             RELATIONSHIP_TYPES,
@@ -94,7 +94,7 @@ class TestExtractionSchema:
 
     def test_patterns_count(self) -> None:
         """Test that we have a reasonable number of patterns."""
-        from jama_scraper.extraction.schema import PATTERNS
+        from graphrag_kg_pipeline.extraction.schema import PATTERNS
 
         # Should have at least 20 patterns for a rich schema
         assert len(PATTERNS) >= 20, (
@@ -103,7 +103,7 @@ class TestExtractionSchema:
 
     def test_industry_has_regulated_property(self) -> None:
         """Test that Industry node type has regulated property."""
-        from jama_scraper.extraction.schema import NODE_TYPES
+        from graphrag_kg_pipeline.extraction.schema import NODE_TYPES
 
         industry = NODE_TYPES.get("Industry")
         assert industry is not None
@@ -113,7 +113,7 @@ class TestExtractionSchema:
 
     def test_standard_has_organization_property(self) -> None:
         """Test that Standard node type has organization property."""
-        from jama_scraper.extraction.schema import NODE_TYPES
+        from graphrag_kg_pipeline.extraction.schema import NODE_TYPES
 
         standard = NODE_TYPES.get("Standard")
         assert standard is not None
@@ -127,7 +127,9 @@ class TestExtractionPrompts:
 
     def test_domain_instructions_content(self) -> None:
         """Test that domain instructions contain key sections."""
-        from jama_scraper.extraction.prompts import REQUIREMENTS_DOMAIN_INSTRUCTIONS
+        from graphrag_kg_pipeline.extraction.prompts import (
+            REQUIREMENTS_DOMAIN_INSTRUCTIONS,
+        )
 
         # Should contain critical classification rules
         assert "Industry vs Concept" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
@@ -136,21 +138,27 @@ class TestExtractionPrompts:
 
     def test_domain_instructions_has_examples(self) -> None:
         """Test that domain instructions include few-shot examples."""
-        from jama_scraper.extraction.prompts import REQUIREMENTS_DOMAIN_INSTRUCTIONS
+        from graphrag_kg_pipeline.extraction.prompts import (
+            REQUIREMENTS_DOMAIN_INSTRUCTIONS,
+        )
 
         assert "FEW-SHOT EXAMPLES" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
         assert "Example 1" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
 
     def test_domain_instructions_has_negative_examples(self) -> None:
         """Test that domain instructions include negative examples."""
-        from jama_scraper.extraction.prompts import REQUIREMENTS_DOMAIN_INSTRUCTIONS
+        from graphrag_kg_pipeline.extraction.prompts import (
+            REQUIREMENTS_DOMAIN_INSTRUCTIONS,
+        )
 
         assert "COMMON MISTAKES TO AVOID" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
         assert "WRONG" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
 
     def test_negative_examples_cover_known_issues(self) -> None:
         """Test that negative examples address known extraction errors."""
-        from jama_scraper.extraction.prompts import REQUIREMENTS_DOMAIN_INSTRUCTIONS
+        from graphrag_kg_pipeline.extraction.prompts import (
+            REQUIREMENTS_DOMAIN_INSTRUCTIONS,
+        )
 
         # Should warn about Concept -[USED_BY]-> Tool
         assert "Concept" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
@@ -168,7 +176,7 @@ class TestExtractionPrompts:
 
     def test_create_extraction_template(self) -> None:
         """Test that extraction template can be created."""
-        from jama_scraper.extraction.prompts import create_extraction_template
+        from graphrag_kg_pipeline.extraction.prompts import create_extraction_template
 
         template = create_extraction_template()
 
@@ -177,7 +185,7 @@ class TestExtractionPrompts:
 
     def test_extraction_template_has_schema_placeholder(self) -> None:
         """Test that template includes schema placeholder."""
-        from jama_scraper.extraction.prompts import create_extraction_template
+        from graphrag_kg_pipeline.extraction.prompts import create_extraction_template
 
         template = create_extraction_template()
 
@@ -185,7 +193,7 @@ class TestExtractionPrompts:
 
     def test_extraction_template_has_text_placeholder(self) -> None:
         """Test that template includes text placeholder."""
-        from jama_scraper.extraction.prompts import create_extraction_template
+        from graphrag_kg_pipeline.extraction.prompts import create_extraction_template
 
         template = create_extraction_template()
 
@@ -193,7 +201,7 @@ class TestExtractionPrompts:
 
     def test_get_few_shot_examples(self) -> None:
         """Test that few-shot examples are properly structured."""
-        from jama_scraper.extraction.prompts import get_few_shot_examples
+        from graphrag_kg_pipeline.extraction.prompts import get_few_shot_examples
 
         examples = get_few_shot_examples()
 
@@ -211,7 +219,7 @@ class TestPipelineConfig:
 
     def test_config_from_env(self, mock_env_vars: dict[str, str]) -> None:
         """Test creating config from environment variables."""
-        from jama_scraper.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
 
         config = JamaKGPipelineConfig.from_env()
 
@@ -222,7 +230,7 @@ class TestPipelineConfig:
 
     def test_config_default_models(self, mock_env_vars: dict[str, str]) -> None:
         """Test that config has sensible default model names."""
-        from jama_scraper.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
 
         config = JamaKGPipelineConfig.from_env()
 
@@ -232,8 +240,8 @@ class TestPipelineConfig:
 
     def test_config_has_chunking_config(self, mock_env_vars: dict[str, str]) -> None:
         """Test that pipeline config includes chunking config."""
-        from jama_scraper.chunking.config import HierarchicalChunkingConfig
-        from jama_scraper.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
+        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
 
         config = JamaKGPipelineConfig.from_env()
 
@@ -244,7 +252,7 @@ class TestPipelineConfig:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test behavior when env vars are missing."""
-        from jama_scraper.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
 
         # Clear all Neo4j env vars
         monkeypatch.delenv("NEO4J_URI", raising=False)

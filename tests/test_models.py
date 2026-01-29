@@ -12,7 +12,7 @@ class TestResourceModels:
 
     def test_resource_type_enum(self) -> None:
         """Test ResourceType enum values."""
-        from jama_scraper.models.resource import ResourceType
+        from graphrag_kg_pipeline.models.resource import ResourceType
 
         assert ResourceType.IMAGE.value == "image"
         assert ResourceType.VIDEO.value == "video"
@@ -21,7 +21,7 @@ class TestResourceModels:
 
     def test_image_resource_creation(self) -> None:
         """Test creating an ImageResource."""
-        from jama_scraper.models.resource import ImageResource
+        from graphrag_kg_pipeline.models.resource import ImageResource
 
         image = ImageResource(
             resource_id="img-001",
@@ -38,7 +38,7 @@ class TestResourceModels:
 
     def test_image_resource_without_caption(self) -> None:
         """Test ImageResource without caption."""
-        from jama_scraper.models.resource import ImageResource
+        from graphrag_kg_pipeline.models.resource import ImageResource
 
         image = ImageResource(
             resource_id="img-002",
@@ -50,7 +50,7 @@ class TestResourceModels:
 
     def test_video_resource_creation(self) -> None:
         """Test creating a VideoResource."""
-        from jama_scraper.models.resource import VideoResource
+        from graphrag_kg_pipeline.models.resource import VideoResource
 
         video = VideoResource(
             resource_id="vid-001",
@@ -73,7 +73,7 @@ class TestCoreModels:
 
     def test_article_model(self) -> None:
         """Test Article model validation."""
-        from jama_scraper.models_core import Article, ContentType
+        from graphrag_kg_pipeline.models_core import Article, ContentType
 
         article = Article(
             article_id="ch1-art1",
@@ -90,7 +90,7 @@ class TestCoreModels:
 
     def test_article_computed_fields(self) -> None:
         """Test that Article has computed word/char counts."""
-        from jama_scraper.models_core import Article, ContentType
+        from graphrag_kg_pipeline.models_core import Article, ContentType
 
         content = "This is test content with multiple words for counting purposes."
         article = Article(
@@ -109,7 +109,7 @@ class TestCoreModels:
 
     def test_chapter_model(self) -> None:
         """Test Chapter model."""
-        from jama_scraper.models_core import Article, Chapter, ContentType
+        from graphrag_kg_pipeline.models_core import Article, Chapter, ContentType
 
         article = Article(
             article_id="ch1-art1",
@@ -133,7 +133,7 @@ class TestCoreModels:
 
     def test_glossary_term_model(self) -> None:
         """Test GlossaryTerm model."""
-        from jama_scraper.models_core import GlossaryTerm
+        from graphrag_kg_pipeline.models_core import GlossaryTerm
 
         term = GlossaryTerm(
             term="Traceability",
@@ -145,7 +145,7 @@ class TestCoreModels:
 
     def test_guide_metadata_model(self) -> None:
         """Test GuideMetadata model."""
-        from jama_scraper.models_core import GuideMetadata
+        from graphrag_kg_pipeline.models_core import GuideMetadata
 
         metadata = GuideMetadata(
             title="The Essential Guide",
@@ -158,7 +158,7 @@ class TestCoreModels:
 
     def test_content_type_enum(self) -> None:
         """Test ContentType enum values."""
-        from jama_scraper.models_core import ContentType
+        from graphrag_kg_pipeline.models_core import ContentType
 
         assert ContentType.ARTICLE.value == "article"
         assert ContentType.CHAPTER_OVERVIEW.value == "chapter_overview"
@@ -171,7 +171,7 @@ class TestModelSerialization:
 
     def test_article_json_serialization(self) -> None:
         """Test that Article serializes to JSON correctly."""
-        from jama_scraper.models_core import Article, ContentType
+        from graphrag_kg_pipeline.models_core import Article, ContentType
 
         article = Article(
             article_id="ch1-art1",
@@ -192,7 +192,7 @@ class TestModelSerialization:
         """Test JSON serialization roundtrip for full guide."""
         import json
 
-        from jama_scraper.models_core import (
+        from graphrag_kg_pipeline.models_core import (
             Article,
             Chapter,
             ContentType,

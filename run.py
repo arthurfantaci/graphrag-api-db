@@ -16,7 +16,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from jama_scraper import run_scraper
+from graphrag_kg_pipeline import run_scraper
 
 
 async def main():
