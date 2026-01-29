@@ -108,18 +108,42 @@ EMBEDDING_MODEL=text-embedding-3-small
 # Run the full pipeline: scrape → extract → load to Neo4j
 graphrag-kg
 
-# With validation report
+# Explicit scrape subcommand (same as above)
+graphrag-kg scrape
+
+# With validation report after pipeline completes
 graphrag-kg scrape --validate
 
 # Skip resource node creation (images, videos, webinars)
 graphrag-kg scrape --skip-resources
 
+# Skip all supplementary structure (chapters, resources, glossary)
+graphrag-kg scrape --skip-supplementary
+
+# Scrape only - skip Neo4j processing (saves JSON/JSONL only)
+graphrag-kg scrape --scrape-only
+
+# Estimate costs without running (dry run)
+graphrag-kg scrape --dry-run
+
+# Use headless browser for JavaScript-rendered content
+graphrag-kg scrape --browser
+
 # Validate the graph and generate report
 graphrag-kg validate
 
-# Preview and apply fixes for data quality issues
+# Save validation report to file
+graphrag-kg validate -o validation_report.md
+
+# Preview what fixes would do without applying
 graphrag-kg validate --fix --dry-run
+
+# Apply all fixes (chunk_ids + entity cleanup)
 graphrag-kg validate --fix
+
+# Apply only specific fix types
+graphrag-kg validate --fix-chunk-ids   # Safe, additive operation
+graphrag-kg validate --fix-entities    # Merges plurals, deletes generic entities
 ```
 
 ### Programmatic Usage
@@ -128,27 +152,46 @@ graphrag-kg validate --fix
 import asyncio
 from graphrag_kg_pipeline import run_scraper
 
-# Run the full ETL pipeline
+# Run the full Neo4j GraphRAG pipeline
 async def main():
     guide = await run_scraper(
-        validate=True,
-        skip_resources=False,
+        output_dir="./output",      # Intermediate files directory
+        run_validation=True,        # Run validation after loading
+        skip_resources=False,       # Include images, videos, webinars
+        skip_supplementary=False,   # Include chapters, glossary structure
     )
     print(f"Loaded {guide.total_articles} articles to Neo4j")
 
 asyncio.run(main())
+
+# Scrape only (no Neo4j processing)
+async def scrape_only():
+    guide = await run_scraper(scrape_only=True)
+    print(f"Scraped {guide.total_articles} articles to JSON/JSONL")
+
+asyncio.run(scrape_only())
 ```
 
 ### Running Validation Only
 
 ```python
 import asyncio
-from neo4j import GraphDatabase
-from graphrag_kg_pipeline.validation.queries import run_all_validations
+from neo4j import AsyncGraphDatabase
+from graphrag_kg_pipeline.validation import generate_validation_report
 
-driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
-results = asyncio.run(run_all_validations(driver))
-print(f"Validation passed: {results['validation_passed']}")
+async def validate_graph():
+    driver = AsyncGraphDatabase.driver(
+        "bolt://localhost:7687",
+        auth=("neo4j", "password")
+    )
+    try:
+        report = await generate_validation_report(driver, "neo4j")
+        print(report.to_markdown())
+        print(f"Validation passed: {report.validation_passed}")
+    finally:
+        await driver.close()
+
+asyncio.run(validate_graph())
 ```
 
 ## Knowledge Graph Schema
@@ -188,8 +231,11 @@ graphrag-kg-pipeline/
 ├── src/graphrag_kg_pipeline/
 │   ├── __init__.py           # Package exports
 │   ├── cli.py                # Command-line interface
-│   ├── scraper.py            # Async web scraper
+│   ├── config.py             # URL configs, chapter/article mappings
+│   ├── fetcher.py            # Protocol-based fetcher (httpx/Playwright)
+│   ├── scraper.py            # Async web scraper + pipeline orchestration
 │   ├── parser.py             # HTML → Markdown parser
+│   ├── exceptions.py         # Custom exception hierarchy
 │   ├── models_core.py        # Pydantic models
 │   ├── models/               # Resource models
 │   │   └── resource.py       # Image, Video, Webinar
