@@ -6,6 +6,8 @@ and glossary linking functionality.
 
 from __future__ import annotations
 
+import pytest
+
 
 class TestIndustryTaxonomy:
     """Tests for industry taxonomy and classification."""
@@ -216,6 +218,190 @@ class TestEntityNormalizer:
 
         assert normalizer is not None
         assert normalizer.driver == driver
+
+
+class TestMislabeledChallengeDetection:
+    """Tests for mislabeled Challenge entity detection."""
+
+    def test_positive_outcome_detected(self) -> None:
+        """Test that positive outcomes are flagged as mislabeled Challenges."""
+        from graphrag_kg_pipeline.postprocessing.entity_cleanup import (
+            is_potentially_mislabeled_challenge,
+        )
+
+        assert is_potentially_mislabeled_challenge("High-Quality Products") is True
+        assert is_potentially_mislabeled_challenge("Improved Delivery") is True
+        assert is_potentially_mislabeled_challenge("Reduced Time-to-Market") is True
+
+    def test_actual_challenges_not_flagged(self) -> None:
+        """Test that genuine challenges are not flagged."""
+        from graphrag_kg_pipeline.postprocessing.entity_cleanup import (
+            is_potentially_mislabeled_challenge,
+        )
+
+        assert is_potentially_mislabeled_challenge("scope creep") is False
+        assert is_potentially_mislabeled_challenge("requirements volatility") is False
+        assert is_potentially_mislabeled_challenge("late defect discovery") is False
+
+    def test_empty_name(self) -> None:
+        """Test empty name returns False."""
+        from graphrag_kg_pipeline.postprocessing.entity_cleanup import (
+            is_potentially_mislabeled_challenge,
+        )
+
+        assert is_potentially_mislabeled_challenge("") is False
+
+    def test_positive_outcome_words_defined(self) -> None:
+        """Test that POSITIVE_OUTCOME_WORDS is a populated frozenset."""
+        from graphrag_kg_pipeline.postprocessing.entity_cleanup import (
+            POSITIVE_OUTCOME_WORDS,
+        )
+
+        assert isinstance(POSITIVE_OUTCOME_WORDS, frozenset)
+        assert len(POSITIVE_OUTCOME_WORDS) > 10
+
+
+class TestMentionedInBackfiller:
+    """Tests for MENTIONED_IN and APPLIES_TO backfill."""
+
+    def test_standard_industry_map_defined(self) -> None:
+        """Test that the Standard→Industry mapping is populated."""
+        from graphrag_kg_pipeline.postprocessing.mentioned_in_backfill import (
+            STANDARD_INDUSTRY_MAP,
+        )
+
+        assert isinstance(STANDARD_INDUSTRY_MAP, dict)
+        assert len(STANDARD_INDUSTRY_MAP) > 10
+
+    def test_standard_industry_map_known_entries(self) -> None:
+        """Test that key standards are mapped to correct industries."""
+        from graphrag_kg_pipeline.postprocessing.mentioned_in_backfill import (
+            STANDARD_INDUSTRY_MAP,
+        )
+
+        assert STANDARD_INDUSTRY_MAP["iso 26262"] == "automotive"
+        assert STANDARD_INDUSTRY_MAP["do-178c"] == "aerospace"
+        assert STANDARD_INDUSTRY_MAP["iec 62304"] == "medical devices"
+
+    def test_backfiller_initialization(self) -> None:
+        """Test that the backfiller initializes correctly."""
+        from graphrag_kg_pipeline.postprocessing.mentioned_in_backfill import (
+            MentionedInBackfiller,
+        )
+        from tests.conftest import MockDriver
+
+        driver = MockDriver()
+        backfiller = MentionedInBackfiller(driver, "neo4j")
+        assert backfiller.driver == driver
+        assert backfiller.database == "neo4j"
+
+    @pytest.mark.asyncio
+    async def test_backfill_mentioned_in(self) -> None:
+        """Test MENTIONED_IN backfill with mock driver."""
+        from graphrag_kg_pipeline.postprocessing.mentioned_in_backfill import (
+            MentionedInBackfiller,
+        )
+        from tests.conftest import MockDriver, MockSession
+
+        session = MockSession()
+        session.set_default_result([{"created": 5}])
+        driver = MockDriver(session)
+
+        backfiller = MentionedInBackfiller(driver, "neo4j")
+        stats = await backfiller.backfill_mentioned_in()
+        assert "mentioned_in_created" in stats
+
+    @pytest.mark.asyncio
+    async def test_backfill_applies_to(self) -> None:
+        """Test APPLIES_TO backfill with mock driver."""
+        from graphrag_kg_pipeline.postprocessing.mentioned_in_backfill import (
+            MentionedInBackfiller,
+        )
+        from tests.conftest import MockDriver, MockSession
+
+        session = MockSession()
+        session.set_default_result([{"created": 1}])
+        driver = MockDriver(session)
+
+        backfiller = MentionedInBackfiller(driver, "neo4j")
+        stats = await backfiller.backfill_applies_to()
+        assert "applies_to_created" in stats
+
+
+class TestEntitySummarizer:
+    """Tests for entity description summarization."""
+
+    def test_summarizer_initialization(self) -> None:
+        """Test that the summarizer initializes correctly."""
+        from graphrag_kg_pipeline.postprocessing.entity_summarizer import EntitySummarizer
+        from tests.conftest import MockDriver
+
+        driver = MockDriver()
+        summarizer = EntitySummarizer(
+            driver=driver,
+            database="neo4j",
+            openai_api_key="sk-test-123",
+        )
+        assert summarizer.model == "gpt-4o"
+
+    def test_parse_fragments_json_array(self) -> None:
+        """Test parsing description fragments from JSON array."""
+        from graphrag_kg_pipeline.postprocessing.entity_summarizer import EntitySummarizer
+        from tests.conftest import MockDriver
+
+        summarizer = EntitySummarizer(
+            driver=MockDriver(), database="neo4j", openai_api_key="sk-test"
+        )
+        fragments = summarizer._parse_fragments('["desc1", "desc2", "desc3"]')
+        assert len(fragments) == 3
+        assert fragments[0] == "desc1"
+
+    def test_parse_fragments_pipe_delimited(self) -> None:
+        """Test parsing pipe-delimited descriptions."""
+        from graphrag_kg_pipeline.postprocessing.entity_summarizer import EntitySummarizer
+        from tests.conftest import MockDriver
+
+        summarizer = EntitySummarizer(
+            driver=MockDriver(), database="neo4j", openai_api_key="sk-test"
+        )
+        fragments = summarizer._parse_fragments("first desc | second desc | third desc")
+        assert len(fragments) == 3
+
+    def test_parse_fragments_single(self) -> None:
+        """Test parsing single description returns list of one."""
+        from graphrag_kg_pipeline.postprocessing.entity_summarizer import EntitySummarizer
+        from tests.conftest import MockDriver
+
+        summarizer = EntitySummarizer(
+            driver=MockDriver(), database="neo4j", openai_api_key="sk-test"
+        )
+        fragments = summarizer._parse_fragments("just a single description")
+        assert len(fragments) == 1
+
+    @pytest.mark.asyncio
+    async def test_summarize_no_entities(self) -> None:
+        """Test summarization with no fragmented entities."""
+        from graphrag_kg_pipeline.postprocessing.entity_summarizer import EntitySummarizer
+        from tests.conftest import MockDriver, MockSession
+
+        session = MockSession()
+        session.set_default_result([])
+        driver = MockDriver(session)
+
+        summarizer = EntitySummarizer(driver=driver, database="neo4j", openai_api_key="sk-test")
+        stats = await summarizer.summarize()
+        assert stats["entities_found"] == 0
+        assert stats["entities_summarized"] == 0
+
+    def test_summarization_prompt_template(self) -> None:
+        """Test that the summarization prompt has expected placeholders."""
+        from graphrag_kg_pipeline.postprocessing.entity_summarizer import (
+            SUMMARIZATION_PROMPT,
+        )
+
+        assert "{entity_name}" in SUMMARIZATION_PROMPT
+        assert "{entity_label}" in SUMMARIZATION_PROMPT
+        assert "{descriptions}" in SUMMARIZATION_PROMPT
 
 
 class TestGlossaryLinker:

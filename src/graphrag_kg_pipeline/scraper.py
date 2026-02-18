@@ -558,6 +558,31 @@ async def _run_post_processing(_output_dir: Path) -> None:
             f"{industry_stats['canonical_count']} industries"
         )
 
+        # MENTIONED_IN + APPLIES_TO backfill
+        console.print("  Backfilling MENTIONED_IN and APPLIES_TO relationships...")
+        from .postprocessing.mentioned_in_backfill import MentionedInBackfiller
+
+        backfiller = MentionedInBackfiller(driver, config.neo4j_database)
+        backfill_stats = await backfiller.backfill()
+        console.print(
+            f"    Created {backfill_stats['mentioned_in_created']} MENTIONED_IN, "
+            f"{backfill_stats['applies_to_created']} APPLIES_TO"
+        )
+
+        # Entity description summarization
+        if config.openai_api_key:
+            console.print("  Summarizing entity descriptions...")
+            from .postprocessing.entity_summarizer import EntitySummarizer
+
+            summarizer = EntitySummarizer(
+                driver=driver,
+                database=config.neo4j_database,
+                openai_api_key=config.openai_api_key,
+                model=config.llm_model,
+            )
+            summ_stats = await summarizer.summarize()
+            console.print(f"    Summarized {summ_stats['entities_summarized']} entities")
+
     finally:
         await driver.close()
 

@@ -251,6 +251,65 @@ PLURAL_TO_SINGULAR: dict[str, str] = {
 }
 
 
+# Words indicating positive outcomes/goals — NOT challenges
+POSITIVE_OUTCOME_WORDS: frozenset[str] = frozenset(
+    {
+        "high-quality",
+        "quality",
+        "satisfaction",
+        "success",
+        "successful",
+        "efficient",
+        "efficiency",
+        "effective",
+        "effectiveness",
+        "improved",
+        "improvement",
+        "reduced",
+        "reduction",
+        "faster",
+        "better",
+        "optimal",
+        "reliable",
+        "reliability",
+        "safe",
+        "safety",
+        "secure",
+        "security",
+        "compliant",
+        "compliance",
+        "innovation",
+        "innovative",
+        "productivity",
+        "performance",
+        "achievement",
+        "benefit",
+        "advantage",
+    }
+)
+
+
+def is_potentially_mislabeled_challenge(name: str) -> bool:
+    """Check if a Challenge entity name suggests a positive outcome, not a challenge.
+
+    Uses first-word matching against POSITIVE_OUTCOME_WORDS to detect
+    mislabeled entities like "High-Quality Products" classified as Challenge.
+
+    Args:
+        name: Entity name to check.
+
+    Returns:
+        True if the entity is likely mislabeled as a Challenge.
+    """
+    if not name:
+        return False
+    words = name.lower().strip().split()
+    if not words:
+        return False
+    # Check first word (whole-word match per Agent #3 recommendation)
+    return words[0] in POSITIVE_OUTCOME_WORDS
+
+
 def is_generic_term(name: str) -> bool:
     """Check if a term is too generic to be useful.
 
