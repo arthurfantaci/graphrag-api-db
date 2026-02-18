@@ -394,6 +394,202 @@ class ValidationQueries:
             result = await session.run(query)
             return {record["name"]: record["relationship_count"] async for record in result}
 
+    async def find_missing_chunk_index(self) -> int:
+        """Find chunks where index is NULL.
+
+        Returns:
+            Count of chunks missing index property.
+        """
+        query = """
+        MATCH (c:Chunk)
+        WHERE c.index IS NULL
+        RETURN count(c) AS missing_count
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            record = await result.single()
+            return record["missing_count"] if record else 0
+
+    async def find_degenerate_chunks(self, min_length: int = 100) -> list[dict]:
+        """Find chunks with very short text and no entity relationships.
+
+        Args:
+            min_length: Minimum text length threshold.
+
+        Returns:
+            List of degenerate chunk details.
+        """
+        query = """
+        MATCH (c:Chunk)
+        WHERE c.text IS NOT NULL AND size(c.text) < $min_length
+        AND NOT EXISTS { MATCH ()-[:MENTIONED_IN]->(c) }
+        RETURN elementId(c) AS element_id,
+               c.text AS text,
+               size(c.text) AS text_length
+        ORDER BY text_length
+        LIMIT 50
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query, min_length=min_length)
+            return [dict(record) async for record in result]
+
+    async def find_truncated_webinar_titles(self) -> list[dict]:
+        """Find webinar nodes with truncated or missing titles.
+
+        Returns:
+            List of webinars with short or missing titles.
+        """
+        query = """
+        MATCH (w:Webinar)
+        WHERE w.title IS NULL OR size(w.title) < 15 OR w.title = 'Webinar'
+        RETURN elementId(w) AS element_id,
+               w.title AS title,
+               w.url AS url
+        LIMIT 50
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            return [dict(record) async for record in result]
+
+    async def find_entities_without_mentioned_in(
+        self,
+        labels: list[str] | None = None,
+    ) -> list[dict]:
+        """Find entities with no MENTIONED_IN relationship to any chunk.
+
+        Args:
+            labels: Entity labels to check. Defaults to LLM_EXTRACTED_ENTITY_LABELS.
+
+        Returns:
+            List of entities without MENTIONED_IN relationships.
+        """
+        labels = labels or LLM_EXTRACTED_ENTITY_LABELS
+        label_list = "[" + ", ".join(f"'{lbl}'" for lbl in labels) + "]"
+
+        query = f"""
+        MATCH (e)
+        WHERE any(lbl IN labels(e) WHERE lbl IN {label_list})
+        AND NOT EXISTS {{ MATCH (e)-[:MENTIONED_IN]->(:Chunk) }}
+        RETURN labels(e)[0] AS label, e.name AS name, elementId(e) AS element_id
+        ORDER BY label, name
+        LIMIT 100
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            return [dict(record) async for record in result]
+
+    async def find_entities_without_semantic_relationships(self) -> list[dict]:
+        """Find entities that have MENTIONED_IN but no outbound semantic relationships.
+
+        These are "ghost" entities that appear in chunks but have no
+        connections to other entities in the knowledge graph.
+
+        Returns:
+            List of entities with only MENTIONED_IN relationships.
+        """
+        query = """
+        MATCH (e)-[:MENTIONED_IN]->(:Chunk)
+        WHERE any(lbl IN labels(e) WHERE lbl IN
+            ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+        AND NOT EXISTS {
+            MATCH (e)-[r]->()
+            WHERE type(r) <> 'MENTIONED_IN'
+        }
+        AND NOT EXISTS {
+            MATCH ()-[r]->(e)
+            WHERE type(r) <> 'MENTIONED_IN'
+        }
+        RETURN labels(e)[0] AS label, e.name AS name, elementId(e) AS element_id
+        ORDER BY label, name
+        LIMIT 100
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            return [dict(record) async for record in result]
+
+    async def find_potentially_mislabeled_entities(self) -> list[dict]:
+        """Find Challenge nodes with names suggesting positive outcomes.
+
+        Returns:
+            List of potentially mislabeled Challenge entities.
+        """
+        from graphrag_kg_pipeline.postprocessing.entity_cleanup import (
+            POSITIVE_OUTCOME_WORDS,
+        )
+
+        # Build Cypher list of positive outcome words
+        word_list = "[" + ", ".join(f"'{w}'" for w in POSITIVE_OUTCOME_WORDS) + "]"
+
+        query = f"""
+        MATCH (c:Challenge)
+        WHERE c.name IS NOT NULL
+        WITH c, split(toLower(c.name), ' ') AS words
+        WHERE any(word IN words WHERE word IN {word_list})
+        RETURN c.name AS name, elementId(c) AS element_id
+        ORDER BY c.name
+        LIMIT 50
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            return [dict(record) async for record in result]
+
+    async def find_near_duplicate_entities(self) -> list[dict]:
+        """Find entities where one name is a substring of another.
+
+        Returns:
+            List of near-duplicate entity pairs.
+        """
+        query = """
+        MATCH (a), (b)
+        WHERE any(lbl IN labels(a) WHERE lbl IN
+            ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+        AND labels(a)[0] = labels(b)[0]
+        AND a.name IS NOT NULL AND b.name IS NOT NULL
+        AND a.name <> b.name
+        AND size(a.name) > 4
+        AND b.name CONTAINS a.name
+        AND size(b.name) - size(a.name) <= 5
+        AND elementId(a) < elementId(b)
+        RETURN labels(a)[0] AS label,
+               a.name AS shorter_name,
+               b.name AS longer_name
+        ORDER BY label, a.name
+        LIMIT 50
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            return [dict(record) async for record in result]
+
+    async def find_missing_definitions(self) -> list[dict]:
+        """Find entities without definition property, grouped by label.
+
+        Returns:
+            List of label/count pairs for entities missing definitions.
+        """
+        query = """
+        MATCH (e)
+        WHERE any(lbl IN labels(e) WHERE lbl IN
+            ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+        AND (e.definition IS NULL OR e.definition = '')
+        WITH labels(e)[0] AS label, count(e) AS count
+        RETURN label, count
+        ORDER BY count DESC
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            result = await session.run(query)
+            return [dict(record) async for record in result]
+
     async def get_chunk_article_mapping(self, limit: int = 100) -> list[dict]:
         """Get chunk to article mapping for chunk_id generation.
 
@@ -445,10 +641,20 @@ async def run_all_validations(
         "entity_stats": await queries.get_entity_stats(),
         "invalid_patterns": await queries.find_invalid_patterns(),
         "article_coverage": await queries.check_article_coverage(),
-        # New checks for chunk_id and entity quality
+        # Chunk quality checks
         "missing_chunk_ids": await queries.find_missing_chunk_ids(),
+        "missing_chunk_index": await queries.find_missing_chunk_index(),
+        "degenerate_chunks": await queries.find_degenerate_chunks(),
+        # Entity quality checks
         "plural_singular_duplicates": await queries.find_plural_singular_duplicates(),
         "generic_entities": await queries.find_generic_entities(),
+        "entities_without_mentioned_in": await queries.find_entities_without_mentioned_in(),
+        "entities_without_semantic_rels": await queries.find_entities_without_semantic_relationships(),
+        "potentially_mislabeled": await queries.find_potentially_mislabeled_entities(),
+        "near_duplicates": await queries.find_near_duplicate_entities(),
+        "missing_definitions": await queries.find_missing_definitions(),
+        # Webinar quality
+        "truncated_webinar_titles": await queries.find_truncated_webinar_titles(),
     }
 
     # Compute summary
@@ -459,19 +665,30 @@ async def run_all_validations(
         "has_missing_embeddings": results["missing_embeddings"] > 0,
         "industry_count_ok": results["industry_count"] <= 19,
         "has_invalid_patterns": len(results["invalid_patterns"]) > 0,
-        # New summary flags
+        # Chunk summary flags
         "has_missing_chunk_ids": results["missing_chunk_ids"] > 0,
+        "has_missing_chunk_index": results["missing_chunk_index"] > 0,
+        "has_degenerate_chunks": len(results["degenerate_chunks"]) > 0,
+        # Entity summary flags
         "has_plural_duplicates": len(results["plural_singular_duplicates"]) > 0,
         "has_generic_entities": len(results["generic_entities"]) > 0,
+        "has_entities_without_mentioned_in": len(results["entities_without_mentioned_in"]) > 0,
+        "has_entities_without_semantic_rels": len(results["entities_without_semantic_rels"]) > 0,
+        "has_potentially_mislabeled": len(results["potentially_mislabeled"]) > 0,
+        "has_near_duplicates": len(results["near_duplicates"]) > 0,
+        "has_missing_definitions": len(results["missing_definitions"]) > 0,
+        "has_truncated_webinar_titles": len(results["truncated_webinar_titles"]) > 0,
     }
 
-    # Overall status - now includes chunk_id and plural duplicates
+    # Overall status — pass/fail includes chunk_index (critical) + existing checks
+    # All other new checks are advisory only
     results["validation_passed"] = all(
         [
             not results["summary"]["has_orphan_chunks"],
             not results["summary"]["has_duplicates"],
             results["summary"]["industry_count_ok"],
             not results["summary"]["has_missing_chunk_ids"],
+            not results["summary"]["has_missing_chunk_index"],
             not results["summary"]["has_plural_duplicates"],
         ]
     )
@@ -483,6 +700,7 @@ async def run_all_validations(
         duplicates=len(results["duplicate_entities"]),
         industries=results["industry_count"],
         missing_chunk_ids=results["missing_chunk_ids"],
+        missing_chunk_index=results["missing_chunk_index"],
         plural_duplicates=len(results["plural_singular_duplicates"]),
         generic_entities=len(results["generic_entities"]),
     )

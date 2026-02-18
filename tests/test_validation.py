@@ -697,6 +697,43 @@ class TestRunAllValidationsWithNewChecks:
         assert "has_generic_entities" in results["summary"]
 
     @pytest.mark.asyncio
+    async def test_includes_phase4_checks(self) -> None:
+        """Test that Phase 4 validation checks are included in results."""
+        from graphrag_kg_pipeline.validation.queries import run_all_validations
+
+        session = MockSession()
+        session.set_result("orphan_count", [{"orphan_count": 0}])
+        session.set_result("missing_count", [{"missing_count": 0}])
+        session.set_result("industry_count", [{"industry_count": 15}])
+        session.set_result(
+            "total_articles", [{"total_articles": 103, "chapters_with_articles": 15}]
+        )
+        session.set_default_result([])
+        driver = MockDriver(session)
+
+        results = await run_all_validations(driver)
+
+        # Phase 4 keys
+        assert "missing_chunk_index" in results
+        assert "degenerate_chunks" in results
+        assert "entities_without_mentioned_in" in results
+        assert "entities_without_semantic_rels" in results
+        assert "potentially_mislabeled" in results
+        assert "near_duplicates" in results
+        assert "missing_definitions" in results
+        assert "truncated_webinar_titles" in results
+
+        # Phase 4 summary flags
+        assert "has_missing_chunk_index" in results["summary"]
+        assert "has_degenerate_chunks" in results["summary"]
+        assert "has_entities_without_mentioned_in" in results["summary"]
+        assert "has_entities_without_semantic_rels" in results["summary"]
+        assert "has_potentially_mislabeled" in results["summary"]
+        assert "has_near_duplicates" in results["summary"]
+        assert "has_missing_definitions" in results["summary"]
+        assert "has_truncated_webinar_titles" in results["summary"]
+
+    @pytest.mark.asyncio
     async def test_validation_fails_with_missing_chunk_ids(self) -> None:
         """Test that validation fails when chunks are missing chunk_id."""
         from graphrag_kg_pipeline.validation.queries import run_all_validations
@@ -717,6 +754,28 @@ class TestRunAllValidationsWithNewChecks:
         results = await run_all_validations(driver)
 
         assert results["summary"]["has_missing_chunk_ids"] is True
+        assert results["validation_passed"] is False
+
+    @pytest.mark.asyncio
+    async def test_validation_fails_with_missing_chunk_index(self) -> None:
+        """Test that validation fails when chunks are missing index."""
+        from graphrag_kg_pipeline.validation.queries import run_all_validations
+
+        session = MockSession()
+        session.set_result("orphan_count", [{"orphan_count": 0}])
+        session.set_result("c.embedding IS NULL", [{"missing_count": 0}])
+        session.set_result("c.chunk_id IS NULL", [{"missing_count": 0}])
+        session.set_result("c.index IS NULL", [{"missing_count": 50}])
+        session.set_result("industry_count", [{"industry_count": 15}])
+        session.set_result(
+            "total_articles", [{"total_articles": 103, "chapters_with_articles": 15}]
+        )
+        session.set_default_result([])
+        driver = MockDriver(session)
+
+        results = await run_all_validations(driver)
+
+        assert results["summary"]["has_missing_chunk_index"] is True
         assert results["validation_passed"] is False
 
 
@@ -750,10 +809,15 @@ class TestValidationFixes:
 
         preview = {
             "summary": {
+                "degenerate_chunks_to_delete": 3,
+                "chunk_indices_to_fix": 0,
                 "chunk_ids_to_fix": 100,
+                "webinar_titles_to_fix": 2,
+                "mislabeled_to_fix": 1,
+                "mentioned_in_estimate": 5,
+                "definitions_to_backfill": 10,
                 "entities_to_delete": 5,
                 "entities_to_merge": 10,
-                "total_changes": 115,
             },
             "chunk_ids": {"total_missing": 100},
             "generic_entities": {
@@ -781,4 +845,422 @@ class TestValidationFixes:
         assert "Chunk IDs to generate: 100" in output
         assert "Generic entities to delete: 5" in output
         assert "Plural entities to merge: 10" in output
-        assert "Total changes: 115" in output
+        assert "Degenerate chunks to delete: 3" in output
+        assert "Webinar titles to fix: 2" in output
+
+
+# =============================================================================
+# PHASE 4: NEW VALIDATION QUERY TESTS
+# =============================================================================
+
+
+class TestPhase4ValidationQueries:
+    """Tests for Phase 4 validation query methods."""
+
+    @pytest.mark.asyncio
+    async def test_find_missing_chunk_index(self) -> None:
+        """Test finding chunks without index property."""
+        from graphrag_kg_pipeline.validation.queries import ValidationQueries
+
+        session = MockSession()
+        session.set_result("c.index IS NULL", [{"missing_count": 42}])
+        driver = MockDriver(session)
+
+        queries = ValidationQueries(driver)
+        count = await queries.find_missing_chunk_index()
+
+        assert count == 42
+
+    @pytest.mark.asyncio
+    async def test_find_degenerate_chunks(self) -> None:
+        """Test finding degenerate chunks."""
+        from graphrag_kg_pipeline.validation.queries import ValidationQueries
+
+        session = MockSession()
+        session.set_result(
+            "size(c.text) < $min_length",
+            [
+                {"element_id": "1", "text": "## Heading Only", "text_length": 15},
+                {"element_id": "2", "text": "Short.", "text_length": 6},
+            ],
+        )
+        driver = MockDriver(session)
+
+        queries = ValidationQueries(driver)
+        chunks = await queries.find_degenerate_chunks()
+
+        assert len(chunks) == 2
+        assert chunks[0]["text_length"] == 15
+
+    @pytest.mark.asyncio
+    async def test_find_truncated_webinar_titles(self) -> None:
+        """Test finding webinars with truncated titles."""
+        from graphrag_kg_pipeline.validation.queries import ValidationQueries
+
+        session = MockSession()
+        session.set_result(
+            "w.title IS NULL OR size(w.title)",
+            [
+                {"element_id": "1", "title": "Webinar", "url": "https://example.com/w1"},
+                {"element_id": "2", "title": None, "url": "https://example.com/w2"},
+            ],
+        )
+        driver = MockDriver(session)
+
+        queries = ValidationQueries(driver)
+        truncated = await queries.find_truncated_webinar_titles()
+
+        assert len(truncated) == 2
+        assert truncated[0]["title"] == "Webinar"
+
+    @pytest.mark.asyncio
+    async def test_find_entities_without_mentioned_in(self) -> None:
+        """Test finding entities without MENTIONED_IN relationships."""
+        from graphrag_kg_pipeline.validation.queries import ValidationQueries
+
+        session = MockSession()
+        session.set_result(
+            "NOT EXISTS",
+            [
+                {"label": "Standard", "name": "ISO 9001", "element_id": "1"},
+                {"label": "Industry", "name": "telecom", "element_id": "2"},
+            ],
+        )
+        driver = MockDriver(session)
+
+        queries = ValidationQueries(driver)
+        entities = await queries.find_entities_without_mentioned_in()
+
+        assert len(entities) == 2
+        assert entities[0]["label"] == "Standard"
+
+    @pytest.mark.asyncio
+    async def test_find_entities_without_semantic_relationships(self) -> None:
+        """Test finding ghost entities with only MENTIONED_IN."""
+        from graphrag_kg_pipeline.validation.queries import ValidationQueries
+
+        session = MockSession()
+        session.set_result(
+            "type(r) <> 'MENTIONED_IN'",
+            [{"label": "Concept", "name": "ghost entity", "element_id": "1"}],
+        )
+        driver = MockDriver(session)
+
+        queries = ValidationQueries(driver)
+        ghosts = await queries.find_entities_without_semantic_relationships()
+
+        assert len(ghosts) == 1
+        assert ghosts[0]["name"] == "ghost entity"
+
+    @pytest.mark.asyncio
+    async def test_find_potentially_mislabeled_entities(self) -> None:
+        """Test finding Challenge nodes with positive-outcome names."""
+        from graphrag_kg_pipeline.validation.queries import ValidationQueries
+
+        session = MockSession()
+        session.set_result(
+            "Challenge",
+            [
+                {"name": "High-Quality Products", "element_id": "1"},
+                {"name": "Improved Delivery", "element_id": "2"},
+            ],
+        )
+        driver = MockDriver(session)
+
+        queries = ValidationQueries(driver)
+        mislabeled = await queries.find_potentially_mislabeled_entities()
+
+        assert len(mislabeled) == 2
+
+    @pytest.mark.asyncio
+    async def test_find_near_duplicate_entities(self) -> None:
+        """Test finding near-duplicate entity pairs."""
+        from graphrag_kg_pipeline.validation.queries import ValidationQueries
+
+        session = MockSession()
+        session.set_result(
+            "b.name CONTAINS a.name",
+            [
+                {
+                    "label": "Concept",
+                    "shorter_name": "trace",
+                    "longer_name": "tracing",
+                }
+            ],
+        )
+        driver = MockDriver(session)
+
+        queries = ValidationQueries(driver)
+        near_dups = await queries.find_near_duplicate_entities()
+
+        assert len(near_dups) == 1
+        assert near_dups[0]["shorter_name"] == "trace"
+
+    @pytest.mark.asyncio
+    async def test_find_missing_definitions(self) -> None:
+        """Test finding entities without definitions."""
+        from graphrag_kg_pipeline.validation.queries import ValidationQueries
+
+        session = MockSession()
+        session.set_result(
+            "e.definition IS NULL",
+            [
+                {"label": "Concept", "count": 45},
+                {"label": "Challenge", "count": 12},
+            ],
+        )
+        driver = MockDriver(session)
+
+        queries = ValidationQueries(driver)
+        missing = await queries.find_missing_definitions()
+
+        assert len(missing) == 2
+        assert missing[0]["label"] == "Concept"
+        assert missing[0]["count"] == 45
+
+
+# =============================================================================
+# PHASE 4: NEW FIX FUNCTION TESTS
+# =============================================================================
+
+
+class TestPhase4Fixes:
+    """Tests for Phase 4 fix functions."""
+
+    @pytest.mark.asyncio
+    async def test_fix_degenerate_chunks_dry_run(self) -> None:
+        """Test dry run for degenerate chunk deletion."""
+        from graphrag_kg_pipeline.validation.fixes import fix_degenerate_chunks
+
+        session = MockSession()
+        session.set_result("found_count", [{"found_count": 7}])
+        driver = MockDriver(session)
+
+        result = await fix_degenerate_chunks(driver, dry_run=True)
+
+        assert result["dry_run"] is True
+        assert result["total_found"] == 7
+        assert result["deleted"] == 0
+
+    @pytest.mark.asyncio
+    async def test_fix_degenerate_chunks_none_found(self) -> None:
+        """Test when no degenerate chunks exist."""
+        from graphrag_kg_pipeline.validation.fixes import fix_degenerate_chunks
+
+        session = MockSession()
+        session.set_result("found_count", [{"found_count": 0}])
+        driver = MockDriver(session)
+
+        result = await fix_degenerate_chunks(driver, dry_run=False)
+
+        assert result["total_found"] == 0
+        assert result["deleted"] == 0
+
+    @pytest.mark.asyncio
+    async def test_fix_missing_chunk_index_dry_run(self) -> None:
+        """Test dry run for chunk index assignment."""
+        from graphrag_kg_pipeline.validation.fixes import fix_missing_chunk_index
+
+        session = MockSession()
+        session.set_result("c.index IS NULL", [{"missing_count": 50}])
+        driver = MockDriver(session)
+
+        result = await fix_missing_chunk_index(driver, dry_run=True)
+
+        assert result["dry_run"] is True
+        assert result["total_missing"] == 50
+        assert result["fixed"] == 0
+
+    @pytest.mark.asyncio
+    async def test_fix_truncated_webinar_titles_dry_run(self) -> None:
+        """Test dry run for webinar title fix."""
+        from graphrag_kg_pipeline.validation.fixes import fix_truncated_webinar_titles
+
+        session = MockSession()
+        session.set_result("found_count", [{"found_count": 3}])
+        driver = MockDriver(session)
+
+        result = await fix_truncated_webinar_titles(driver, dry_run=True)
+
+        assert result["dry_run"] is True
+        assert result["total_found"] == 3
+        assert result["fixed"] == 0
+
+    @pytest.mark.asyncio
+    async def test_fix_mislabeled_entities_dry_run(self) -> None:
+        """Test dry run for mislabeled entity relabeling."""
+        from graphrag_kg_pipeline.validation.fixes import fix_mislabeled_entities
+
+        session = MockSession()
+        session.set_result(
+            "Challenge",
+            [
+                {"element_id": "1", "name": "High-Quality Products"},
+                {"element_id": "2", "name": "Improved Delivery"},
+            ],
+        )
+        driver = MockDriver(session)
+
+        result = await fix_mislabeled_entities(driver, dry_run=True)
+
+        assert result["dry_run"] is True
+        assert result["total_found"] == 2
+
+    @pytest.mark.asyncio
+    async def test_fix_missing_mentioned_in_dry_run(self) -> None:
+        """Test dry run for MENTIONED_IN backfill."""
+        from graphrag_kg_pipeline.validation.fixes import fix_missing_mentioned_in
+
+        session = MockSession()
+        session.set_result("estimate", [{"estimate": 15}])
+        driver = MockDriver(session)
+
+        result = await fix_missing_mentioned_in(driver, dry_run=True)
+
+        assert result["dry_run"] is True
+        assert result["entities_without_mentioned_in"] == 15
+
+    @pytest.mark.asyncio
+    async def test_fix_missing_definitions_dry_run(self) -> None:
+        """Test dry run for definition backfill."""
+        from graphrag_kg_pipeline.validation.fixes import fix_missing_definitions
+
+        session = MockSession()
+        session.set_result("e.definition IS NULL", [{"missing_count": 30}])
+        driver = MockDriver(session)
+
+        result = await fix_missing_definitions(driver, dry_run=True)
+
+        assert result["dry_run"] is True
+        assert result["total_missing"] == 30
+        assert result["backfilled"] == 0
+
+    @pytest.mark.asyncio
+    async def test_fix_missing_definitions_none_missing(self) -> None:
+        """Test when no definitions are missing."""
+        from graphrag_kg_pipeline.validation.fixes import fix_missing_definitions
+
+        session = MockSession()
+        session.set_result("e.definition IS NULL", [{"missing_count": 0}])
+        driver = MockDriver(session)
+
+        result = await fix_missing_definitions(driver, dry_run=False)
+
+        assert result["total_missing"] == 0
+        assert result["backfilled"] == 0
+
+
+class TestPhase4Reporter:
+    """Tests for Phase 4 reporter sections."""
+
+    def test_report_includes_new_sections(self) -> None:
+        """Test that report markdown includes Phase 4 sections."""
+        from graphrag_kg_pipeline.validation.reporter import ValidationReport
+
+        report = ValidationReport(
+            validation_passed=False,
+            summary={
+                "has_orphan_chunks": False,
+                "has_orphan_entities": False,
+                "has_duplicates": False,
+                "has_missing_embeddings": False,
+                "industry_count_ok": True,
+                "has_invalid_patterns": False,
+                "has_missing_chunk_ids": False,
+                "has_missing_chunk_index": True,
+                "has_degenerate_chunks": True,
+                "has_plural_duplicates": False,
+                "has_generic_entities": False,
+                "has_entities_without_mentioned_in": True,
+                "has_entities_without_semantic_rels": True,
+                "has_potentially_mislabeled": True,
+                "has_near_duplicates": True,
+                "has_missing_definitions": True,
+                "has_truncated_webinar_titles": True,
+            },
+            details={
+                "orphan_chunks": 0,
+                "orphan_entities": [],
+                "duplicate_entities": [],
+                "missing_embeddings": 0,
+                "industry_count": 18,
+                "entity_stats": {"Concept": 100},
+                "invalid_patterns": [],
+                "article_coverage": {"total_articles": 103, "chapters_with_articles": 15},
+                "missing_chunk_ids": 0,
+                "missing_chunk_index": 50,
+                "degenerate_chunks": [
+                    {"element_id": "1", "text": "## Just a heading", "text_length": 17}
+                ],
+                "plural_singular_duplicates": [],
+                "generic_entities": [],
+                "potentially_mislabeled": [{"name": "High-Quality Products", "element_id": "1"}],
+                "entities_without_mentioned_in": [
+                    {"label": "Standard", "name": "ISO 9001", "element_id": "1"}
+                ],
+                "entities_without_semantic_rels": [
+                    {"label": "Concept", "name": "ghost entity", "element_id": "1"}
+                ],
+                "near_duplicates": [
+                    {"label": "Concept", "shorter_name": "trace", "longer_name": "tracing"}
+                ],
+                "missing_definitions": [
+                    {"label": "Concept", "count": 45},
+                ],
+                "truncated_webinar_titles": [
+                    {"element_id": "1", "title": "Webinar", "url": "https://example.com"}
+                ],
+            },
+            recommendations=[],
+        )
+
+        markdown = report.to_markdown()
+
+        assert "Missing Chunk Index" in markdown
+        assert "Degenerate Chunks" in markdown
+        assert "Potentially Mislabeled Challenges" in markdown
+        assert "Entities Without MENTIONED_IN" in markdown
+        assert "Ghost Entities" in markdown
+        assert "Near-Duplicate Entities" in markdown
+        assert "Missing Definitions" in markdown
+        assert "Truncated Webinar Titles" in markdown
+
+    def test_recommendations_include_new_fixes(self) -> None:
+        """Test that recommendations cover Phase 4 fixes."""
+        from graphrag_kg_pipeline.validation.reporter import ValidationReporter
+
+        driver = MockDriver()
+        reporter = ValidationReporter(driver)
+
+        results = {
+            "orphan_chunks": 0,
+            "orphan_entities": [],
+            "duplicate_entities": [],
+            "missing_embeddings": 0,
+            "industry_count": 15,
+            "invalid_patterns": [],
+            "missing_chunk_ids": 0,
+            "missing_chunk_index": 50,
+            "degenerate_chunks": [{"element_id": "1"}],
+            "plural_singular_duplicates": [],
+            "generic_entities": [],
+            "potentially_mislabeled": [{"name": "Good Products"}],
+            "entities_without_mentioned_in": [{"label": "Standard"}] * 5,
+            "entities_without_semantic_rels": [{"label": "Concept"}] * 3,
+            "near_duplicates": [{"label": "Concept"}] * 2,
+            "missing_definitions": [{"label": "Concept", "count": 20}],
+            "truncated_webinar_titles": [{"element_id": "1"}],
+        }
+
+        recommendations = reporter._generate_recommendations(results)
+
+        # Check new recommendation types exist
+        rec_text = " ".join(recommendations)
+        assert "chunk indices" in rec_text
+        assert "degenerate chunks" in rec_text
+        assert "mislabeled" in rec_text
+        assert "MENTIONED_IN" in rec_text
+        assert "definitions" in rec_text
+        assert "webinar titles" in rec_text
+        assert "ghost entities" in rec_text
+        assert "near-duplicate" in rec_text
