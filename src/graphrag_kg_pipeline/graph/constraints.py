@@ -264,6 +264,32 @@ async def create_all_constraints(
     return await manager.create_all()
 
 
+async def create_fulltext_index(
+    driver: "Driver",
+    database: str = "neo4j",
+    index_name: str = "chunk_text_fulltext",
+) -> None:
+    """Create full-text index for BM25 hybrid search on Chunk text.
+
+    Enables keyword-based retrieval alongside vector search for exact terms
+    like standard names ("ISO 26262"), acronyms ("RTM"), and technical terms.
+
+    Args:
+        driver: Neo4j driver.
+        database: Database name.
+        index_name: Name for the full-text index.
+    """
+    query = f"""
+    CREATE FULLTEXT INDEX {index_name} IF NOT EXISTS
+    FOR (c:Chunk) ON EACH [c.text]
+    """
+
+    async with driver.session(database=database) as session:
+        await session.run(query)
+
+    logger.info("Created full-text index", index_name=index_name)
+
+
 async def create_vector_index(
     driver: "Driver",
     database: str = "neo4j",

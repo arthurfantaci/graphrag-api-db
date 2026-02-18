@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from neo4j import Driver
     from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
 
-    from graphrag_kg_pipeline.models import RequirementsManagementGuide
+    from graphrag_kg_pipeline.models import Glossary, RequirementsManagementGuide
 
 logger = structlog.get_logger(__name__)
 
@@ -203,13 +203,16 @@ def create_jama_kg_pipeline(
     # Create Neo4j driver
     driver = create_neo4j_driver(config)
 
-    # Create LLM for extraction with JSON response format
+    # Create LLM for extraction
+    # Note: response_format removed — the extraction prompt template instructs
+    # JSON output, and neo4j_graphrag's extractor handles JSON parsing/repair.
+    # When SimpleKGPipeline adds use_structured_output support, enable it for
+    # Pydantic-validated structured outputs (see LLMEntityRelationExtractor V2).
     llm = OpenAILLM(
         model_name=config.llm_model,
         api_key=config.openai_api_key,
         model_params={
             "temperature": 0,
-            "response_format": {"type": "json_object"},
         },
     )
 
@@ -260,6 +263,29 @@ def create_jama_kg_pipeline(
 
     logger.info("Pipeline created successfully")
     return pipeline
+
+
+def format_glossary_for_pipeline(glossary: "Glossary") -> str:
+    """Format glossary terms as structured markdown for pipeline processing.
+
+    Creates a markdown document where each term becomes an H2 section,
+    enabling the hierarchical chunker to split on term boundaries.
+    Each chunk then gets embedded for vector search and sent through
+    LLM extraction for entity/relationship discovery.
+
+    Args:
+        glossary: Glossary object with terms.
+
+    Returns:
+        Markdown-formatted string of all glossary terms.
+    """
+    sections = ["# Requirements Management Glossary\n"]
+    for term in glossary.terms:
+        sections.append(f"## {term.term}")
+        if term.acronym:
+            sections.append(f"**Acronym**: {term.acronym}\n")
+        sections.append(f"{term.definition}\n")
+    return "\n".join(sections)
 
 
 async def process_article_with_pipeline(
@@ -392,6 +418,42 @@ async def process_guide_with_pipeline(
                     article_id=article.article_id,
                     status=result["status"],
                     progress=f"{stats['processed']}/{stats['total_articles']}",
+                )
+
+        # Process glossary through the pipeline for entity extraction + embedding
+        if guide.glossary and guide.glossary.terms:
+            logger.info(
+                "Processing glossary through pipeline",
+                term_count=len(guide.glossary.terms),
+            )
+            glossary_markdown = format_glossary_for_pipeline(guide.glossary)
+            glossary_metadata = {
+                "chapter_number": "0",
+                "chapter_title": "Glossary",
+                "article_number": "0",
+                "article_title": "Requirements Management Glossary",
+                "url": guide.glossary.url or "",
+                "content_type": "glossary",
+            }
+
+            result = await process_article_with_pipeline(
+                pipeline=pipeline,
+                article_id="glossary",
+                markdown_content=glossary_markdown,
+                article_metadata=glossary_metadata,
+            )
+
+            stats["processed"] += 1
+            if result["status"] == "success":
+                stats["succeeded"] += 1
+                logger.info("Glossary processed successfully")
+            else:
+                stats["failed"] += 1
+                stats["errors"].append(
+                    {
+                        "article_id": "glossary",
+                        "error": result.get("error", "Unknown error"),
+                    }
                 )
 
         logger.info(

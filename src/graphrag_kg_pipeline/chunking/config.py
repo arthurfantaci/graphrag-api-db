@@ -41,8 +41,8 @@ class HierarchicalChunkingConfig:
     sliding_window_overlap: int = 64
     sliding_window_threshold: int = 1500
 
-    # Filtering configuration
-    min_chunk_size: int = 50
+    # Filtering configuration — 100 prevents degenerate heading-only chunks
+    min_chunk_size: int = 100
 
     # RecursiveCharacterTextSplitter configuration
     separators: tuple[str, ...] = field(

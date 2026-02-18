@@ -21,6 +21,7 @@ class TestHierarchicalChunkingConfig:
         assert config.sliding_window_size == 512
         assert config.sliding_window_overlap == 64
         assert config.sliding_window_threshold == 1500
+        assert config.min_chunk_size == 100  # Raised from 50 to prevent degenerate chunks
         assert len(config.headers_to_split_on) == 3
 
     def test_custom_values(self) -> None:
@@ -150,6 +151,56 @@ class TestHierarchicalHTMLSplitter:
             assert hasattr(doc, "page_content")
 
 
+class TestHeaderMetadataPrepending:
+    """Tests for header metadata prepending to chunk text."""
+
+    def test_prepend_article_metadata(self) -> None:
+        """Test that article metadata is prepended to chunk content."""
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
+
+        html = (
+            "<h1>Guide Title</h1>"
+            "<h2>Requirements Traceability</h2>"
+            "<p>" + "Traceability is the ability to trace requirements. " * 10 + "</p>"
+            "<h2>Impact Analysis</h2>"
+            "<p>" + "Impact analysis helps assess change effects. " * 10 + "</p>"
+        )
+
+        config = HierarchicalChunkingConfig(min_chunk_size=50)
+        splitter = HierarchicalHTMLSplitter(config)
+
+        docs = splitter.split_text_as_documents(
+            html,
+            article_metadata={"article_title": "Best Practices"},
+        )
+
+        assert len(docs) > 0
+        # Chunks should start with the article context prefix
+        assert docs[0].page_content.startswith("Article: Best Practices")
+
+    def test_no_metadata_no_prefix(self) -> None:
+        """Test that chunks are unchanged without article_metadata."""
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
+
+        html = (
+            "<h2>Section Title</h2>"
+            "<p>" + "Some meaningful content here for testing. " * 10 + "</p>"
+        )
+
+        config = HierarchicalChunkingConfig(min_chunk_size=50)
+        splitter = HierarchicalHTMLSplitter(config)
+
+        docs = splitter.split_text_as_documents(html)
+
+        assert len(docs) > 0
+        # No prefix should be added
+        assert not docs[0].page_content.startswith("Article:")
+
+
 class TestMarkdownSplitter:
     """Tests for the MarkdownSplitter class."""
 
@@ -159,15 +210,15 @@ class TestMarkdownSplitter:
 
         markdown = """# Title
 
-Introduction paragraph.
+Introduction paragraph with enough content to pass the minimum chunk size filter.
 
 ## Section One
 
-This is section one content with enough text to be meaningful.
+This is section one content with enough text to be meaningful for entity extraction and retrieval purposes. Requirements traceability is the ability to trace requirements through their lifecycle.
 
 ## Section Two
 
-This is section two content with more text.
+This is section two content with more text about impact analysis. Impact analysis helps teams understand how changes to one requirement affect other parts of the system.
 """
 
         splitter = MarkdownSplitter()

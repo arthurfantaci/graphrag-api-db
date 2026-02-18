@@ -28,7 +28,7 @@ dependencies = [
     "rich>=13.7.0",
     "tenacity>=8.2.0",
     # Neo4j GraphRAG pipeline (replaces langextract)
-    "neo4j-graphrag>=1.0.0",
+    "neo4j-graphrag>=1.13.0",
     "langchain-text-splitters>=0.3.0",
     # Entity matching and normalization
     "rapidfuzz>=3.0.0",

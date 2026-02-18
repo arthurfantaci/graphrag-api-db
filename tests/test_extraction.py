@@ -264,3 +264,48 @@ class TestPipelineConfig:
         except (ValueError, KeyError):
             # Expected if strict validation
             pass
+
+
+class TestGlossaryPipelineProcessing:
+    """Tests for glossary formatting and pipeline integration."""
+
+    def test_format_glossary_for_pipeline(self) -> None:
+        """Test that glossary is formatted as structured markdown."""
+        from graphrag_kg_pipeline.extraction.pipeline import format_glossary_for_pipeline
+        from graphrag_kg_pipeline.models_core import Glossary, GlossaryTerm
+
+        glossary = Glossary(
+            url="https://example.com/glossary",
+            terms=[
+                GlossaryTerm(
+                    term="Traceability",
+                    definition="The ability to trace a requirement through its lifecycle.",
+                    acronym=None,
+                ),
+                GlossaryTerm(
+                    term="RTM",
+                    definition="A document that maps requirements to test cases.",
+                    acronym="RTM",
+                ),
+            ],
+        )
+
+        result = format_glossary_for_pipeline(glossary)
+
+        # Should be valid markdown with H1 and H2 headers
+        assert "# Requirements Management Glossary" in result
+        assert "## Traceability" in result
+        assert "## RTM" in result
+        assert "**Acronym**: RTM" in result
+        assert "The ability to trace a requirement" in result
+
+    def test_format_glossary_empty_terms(self) -> None:
+        """Test formatting with no terms produces just the header."""
+        from graphrag_kg_pipeline.extraction.pipeline import format_glossary_for_pipeline
+        from graphrag_kg_pipeline.models_core import Glossary
+
+        glossary = Glossary(url="https://example.com/glossary", terms=[])
+        result = format_glossary_for_pipeline(glossary)
+
+        assert "# Requirements Management Glossary" in result
+        assert "##" not in result

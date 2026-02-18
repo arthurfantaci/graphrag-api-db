@@ -575,7 +575,11 @@ async def _build_supplementary_structure(
         skip_resources: If True, skip resource nodes.
     """
     from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
-    from .graph.constraints import create_all_constraints, create_vector_index
+    from .graph.constraints import (
+        create_all_constraints,
+        create_fulltext_index,
+        create_vector_index,
+    )
     from .graph.supplementary import SupplementaryGraphBuilder
 
     console.print("\n[bold cyan]Building supplementary graph structure...[/]")
@@ -592,6 +596,7 @@ async def _build_supplementary_structure(
             config.neo4j_database,
             dimensions=config.embedding_dimensions,
         )
+        await create_fulltext_index(driver, config.neo4j_database)
 
         # Build supplementary structure
         builder = SupplementaryGraphBuilder(driver, config.neo4j_database)
