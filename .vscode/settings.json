@@ -3,21 +3,17 @@
   // PYTHON ENVIRONMENT
   // ==========================================================================
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
   "python.createEnvironment.trigger": "off",
 
   // ==========================================================================
   // TYPE CHECKING (Pylance)
   // ==========================================================================
   "python.analysis.typeCheckingMode": "basic",
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}/.venv/lib/python3.13/site-packages"
-  ],
   "python.analysis.autoImportCompletions": true,
-  "python.analysis.diagnosticSeverityOverrides": {
-    "reportMissingTypeStubs": "none",
-    "reportUnknownMemberType": "none",
-    "reportUnknownArgumentType": "none"
-  },
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.inlayHints.functionReturnTypes": true,
+  "python.analysis.inlayHints.variableTypes": false,
 
   // ==========================================================================
   // LINTING & FORMATTING (Ruff)
@@ -25,6 +21,8 @@
   "ruff.enable": true,
   "ruff.path": ["${workspaceFolder}/.venv/bin/ruff"],
   "ruff.configuration": "${workspaceFolder}/pyproject.toml",
+  "ruff.importStrategy": "fromEnvironment",
+  "ruff.lint.enable": true,
   "ruff.showSyntaxErrors": true,
   "ruff.organizeImports": true,
   "python.linting.enabled": false,
@@ -41,6 +39,16 @@
       "source.organizeImports.ruff": "explicit"
     }
   },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  },
+  "[markdown]": {
+    "editor.wordWrap": "on"
+  },
 
   // ==========================================================================
   // TESTING (Pytest)
@@ -52,30 +60,42 @@
   // ==========================================================================
   // EDITOR EXPERIENCE
   // ==========================================================================
-  "python.analysis.inlayHints.functionReturnTypes": true,
-  "python.analysis.inlayHints.variableTypes": false,
   "editor.rulers": [88],
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
   "editor.renderWhitespace": "selection",
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
 
   // ==========================================================================
+  // TERMINAL
+  // ==========================================================================
+  "terminal.integrated.env.osx": {
+    "PYTHONPATH": "${workspaceFolder}/src"
+  },
+  "terminal.integrated.env.linux": {
+    "PYTHONPATH": "${workspaceFolder}/src"
+  },
+
+  // ==========================================================================
   // FILE ASSOCIATIONS
   // ==========================================================================
   "files.associations": {
-    ".env": "dotenv",
-    ".env.example": "dotenv",
-    "*.py": "python"
+    "*.env": "dotenv",
+    "*.env.*": "dotenv",
+    ".env.example": "dotenv"
   },
   "files.exclude": {
     "**/__pycache__": true,
     "**/*.pyc": true,
     "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
     "**/*.egg-info": true,
-    ".ruff_cache": true
+    "**/htmlcov": true
   },
   "search.exclude": {
     "**/.venv": true,
+    "**/.git": true,
     "**/uv.lock": true
   }
 }
