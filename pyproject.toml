@@ -189,7 +189,6 @@ ignore = [
 "**/extraction/pipeline.py" = ["PLC0415", "PLR0913", "TRY300", "TRY400"]
 "**/extraction/schema.py" = ["E501"]  # Long description strings
 "**/extraction/prompts.py" = ["E501", "PLC0415"]  # Long prompt strings
-"**/extraction/example_selector.py" = ["PLC0415"]  # Lazy import for circular dependency avoidance
 "**/extraction/gleaning.py" = ["PLC0415"]  # Lazy import for openai
 "**/postprocessing/*.py" = ["PLC0415", "E501", "RET504", "PLR0911", "PLR0912", "PLR0915", "PLR2004", "TRY400"]  # Cypher queries, complex taxonomy logic
 "**/graph/*.py" = ["PLC0415", "PLR0915", "SIM102"]
