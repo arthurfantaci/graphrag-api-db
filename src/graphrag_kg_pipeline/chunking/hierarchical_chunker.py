@@ -118,9 +118,7 @@ class HierarchicalHTMLSplitter:
 
         return result
 
-    def split_text_with_positions(
-        self, html_content: str
-    ) -> list[tuple["Document", int, int]]:
+    def split_text_with_positions(self, html_content: str) -> list[tuple["Document", int, int]]:
         """Split HTML content and track character positions.
 
         Like split_text but also returns start/end character positions

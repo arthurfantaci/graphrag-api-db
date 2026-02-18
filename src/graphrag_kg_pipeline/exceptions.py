@@ -39,9 +39,7 @@ class PlaywrightNotAvailableError(ScraperError):
 
     def __init__(self) -> None:
         """Initialize PlaywrightNotAvailableError."""
-        super().__init__(
-            "Playwright not installed. Install with: uv sync --group browser"
-        )
+        super().__init__("Playwright not installed. Install with: uv sync --group browser")
 
 
 class BrowserNotInstalledError(ScraperError):

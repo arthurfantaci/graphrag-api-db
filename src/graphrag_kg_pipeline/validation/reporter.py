@@ -143,25 +143,20 @@ class ValidationReport:
                 remaining = len(self.details["plural_singular_duplicates"]) - 15
                 lines.append(f"| ... | {remaining} more pairs | ... | ... | ... |")
             lines.append("")
-            lines.append(
-                "Run `graphrag-kg validate --fix` to merge plurals into singulars."
-            )
+            lines.append("Run `graphrag-kg validate --fix` to merge plurals into singulars.")
             lines.append("")
 
         # Generic entities
         if self.details.get("generic_entities"):
             lines.append("### ⚠️ Generic Entities")
             lines.append("")
-            lines.append(
-                "Found overly generic entity names that provide no semantic value:"
-            )
+            lines.append("Found overly generic entity names that provide no semantic value:")
             lines.append("")
             lines.append("| Label | Name | Relationships |")
             lines.append("|-------|------|---------------|")
             for entity in self.details["generic_entities"][:15]:
                 lines.append(
-                    f"| {entity['label']} | {entity['name']} | "
-                    f"{entity['relationship_count']} |"
+                    f"| {entity['label']} | {entity['name']} | {entity['relationship_count']} |"
                 )
             if len(self.details["generic_entities"]) > 15:
                 remaining = len(self.details["generic_entities"]) - 15
@@ -260,9 +255,7 @@ class ValidationReporter:
                 "article_coverage": results["article_coverage"],
                 # New details
                 "missing_chunk_ids": results.get("missing_chunk_ids", 0),
-                "plural_singular_duplicates": results.get(
-                    "plural_singular_duplicates", []
-                ),
+                "plural_singular_duplicates": results.get("plural_singular_duplicates", []),
                 "generic_entities": results.get("generic_entities", []),
             },
             recommendations=self._generate_recommendations(results),

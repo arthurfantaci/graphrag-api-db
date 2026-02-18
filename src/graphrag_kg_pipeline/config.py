@@ -46,9 +46,7 @@ CHAPTERS: list[ChapterConfig] = [
         slug="requirements-management",
         articles=[
             ArticleConfig(0, "Overview", ""),
-            ArticleConfig(
-                1, "What is Requirements Management?", "what-is-requirements-management"
-            ),
+            ArticleConfig(1, "What is Requirements Management?", "what-is-requirements-management"),
             ArticleConfig(
                 2,
                 "Why do you need Requirements Management?",
@@ -164,9 +162,7 @@ CHAPTERS: list[ChapterConfig] = [
                 "Requirements Gathering Techniques for Agile Product Teams",
                 "11-requirements-gathering-techniques-for-agile-product-teams",
             ),
-            ArticleConfig(
-                5, "What is Requirements Gathering?", "what-is-requirements-gathering"
-            ),
+            ArticleConfig(5, "What is Requirements Gathering?", "what-is-requirements-gathering"),
             ArticleConfig(
                 6,
                 "Defining and Implementing a Requirements Baseline",
@@ -177,9 +173,7 @@ CHAPTERS: list[ChapterConfig] = [
                 "Managing Project Scope — Why It Matters and Best Practices",
                 "managing-project-scope-why-it-matters-and-best-practices",
             ),
-            ArticleConfig(
-                8, "How Long Do Requirements Take?", "how-long-do-requirements-take"
-            ),
+            ArticleConfig(8, "How Long Do Requirements Take?", "how-long-do-requirements-take"),
             ArticleConfig(
                 9,
                 "How to Reuse Requirements Across Multiple Products",
@@ -303,9 +297,7 @@ CHAPTERS: list[ChapterConfig] = [
                 "Application Lifecycle Management (ALM)",
                 "application-lifecycle-management-alm",
             ),
-            ArticleConfig(
-                5, "Is There Life After DOORS®?", "is-there-life-after-doors"
-            ),
+            ArticleConfig(5, "Is There Life After DOORS®?", "is-there-life-after-doors"),
             ArticleConfig(
                 6,
                 "Can You Track Requirements in Jira?",
@@ -333,9 +325,7 @@ CHAPTERS: list[ChapterConfig] = [
         slug="meeting-regulatory-compliance-and-industry-standards",
         articles=[
             ArticleConfig(0, "Overview", ""),
-            ArticleConfig(
-                1, "Understanding ISO Standards", "understanding-iso-standards"
-            ),
+            ArticleConfig(1, "Understanding ISO Standards", "understanding-iso-standards"),
             ArticleConfig(
                 2,
                 "Understanding ISO/IEC 27001",
@@ -347,9 +337,7 @@ CHAPTERS: list[ChapterConfig] = [
                 "what-is-devsecops-a-guide-to-building-secure-software",
             ),
             ArticleConfig(4, "Compliance Management", "compliance-management"),
-            ArticleConfig(
-                5, "What is FMEA? Failure Modes and Effects Analysis", "fmea"
-            ),
+            ArticleConfig(5, "What is FMEA? Failure Modes and Effects Analysis", "fmea"),
             ArticleConfig(
                 6,
                 "TÜV SÜD: Ensuring Safety, Quality, and Sustainability",
@@ -363,9 +351,7 @@ CHAPTERS: list[ChapterConfig] = [
         slug="systems-engineering",
         articles=[
             ArticleConfig(0, "Overview", ""),
-            ArticleConfig(
-                1, "What is Systems Engineering?", "what-is-systems-engineering"
-            ),
+            ArticleConfig(1, "What is Systems Engineering?", "what-is-systems-engineering"),
             ArticleConfig(
                 2,
                 "How Do Engineers Collaborate?",
@@ -418,9 +404,7 @@ CHAPTERS: list[ChapterConfig] = [
                 "Software as a Medical Device: Revolutionizing Healthcare",
                 "software-as-a-medical-device-revolutionizing-healthcare",
             ),
-            ArticleConfig(
-                3, "What's a Design History File (DHF)?", "design-history-file-dhf"
-            ),
+            ArticleConfig(3, "What's a Design History File (DHF)?", "design-history-file-dhf"),
             ArticleConfig(
                 4,
                 "Navigating the Risks of SOUP",

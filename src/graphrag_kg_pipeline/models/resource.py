@@ -109,9 +109,7 @@ class VideoResource(BaseResource):
     platform: str = Field(default="youtube", description="Video platform")
     embed_url: str = Field(description="Video embed URL")
     title: str | None = Field(default=None, description="Video title")
-    duration_seconds: int | None = Field(
-        default=None, description="Duration in seconds"
-    )
+    duration_seconds: int | None = Field(default=None, description="Duration in seconds")
     context: str | None = Field(default=None, description="Surrounding text context")
 
     @computed_field
@@ -143,9 +141,7 @@ class WebinarResource(BaseResource):
         default=ResourceType.WEBINAR, description="Resource type discriminator"
     )
     title: str = Field(description="Webinar title")
-    description: str | None = Field(
-        default=None, description="Webinar description or summary"
-    )
+    description: str | None = Field(default=None, description="Webinar description or summary")
     thumbnail_url: str | None = Field(default=None, description="Thumbnail image URL")
     presenter: str | None = Field(default=None, description="Webinar presenter name")
     context: str | None = Field(default=None, description="Surrounding context")
@@ -177,9 +173,7 @@ class DefinitionResource(BaseResource):
     term: str = Field(description="The term being defined")
     definition: str = Field(description="Definition text")
     acronym: str | None = Field(default=None, description="Acronym if applicable")
-    related_terms: list[str] = Field(
-        default_factory=list, description="Related glossary terms"
-    )
+    related_terms: list[str] = Field(default_factory=list, description="Related glossary terms")
     related_concept_ids: list[str] = Field(
         default_factory=list, description="Linked Concept entity IDs"
     )

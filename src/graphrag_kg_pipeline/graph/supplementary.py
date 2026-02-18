@@ -65,9 +65,7 @@ class SupplementaryGraphBuilder:
         }
 
         # Create chapter structure
-        chapter_stats = await create_chapter_structure(
-            self.driver, guide, self.database
-        )
+        chapter_stats = await create_chapter_structure(self.driver, guide, self.database)
         stats["chapters"] = chapter_stats.get("chapters_created", 0)
 
         # Create resource nodes
@@ -84,9 +82,7 @@ class SupplementaryGraphBuilder:
             stats["definitions"] = glossary_stats.get("definitions", 0)
 
         # Create article relationships
-        rel_stats = await create_article_relationships(
-            self.driver, guide, self.database
-        )
+        rel_stats = await create_article_relationships(self.driver, guide, self.database)
         stats["article_relationships"] = rel_stats.get("relationships", 0)
 
         logger.info(

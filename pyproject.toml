@@ -10,6 +10,14 @@ authors = [
     { name = "Arthur Fantaci", email = "afantaci@norfolkaibi.com" },
 ]
 keywords = ["knowledge-graph", "graphrag", "neo4j", "requirements-management", "rag", "pipeline", "norfolk-ai-bi"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 
 dependencies = [
     "httpx>=0.27.0",
@@ -33,6 +41,10 @@ dependencies = [
     "neo4j>=5.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/arthurfantaci/graphrag-api-db"
+Repository = "https://github.com/arthurfantaci/graphrag-api-db"
+
 [project.scripts]
 graphrag-kg = "graphrag_kg_pipeline.cli:main"
 
@@ -45,7 +57,7 @@ packages = ["src/graphrag_kg_pipeline"]
 
 # PEP 735 dependency groups (preferred over [project.optional-dependencies])
 [dependency-groups]
-dev = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0", "pytest-cov>=4.0.0", "ruff>=0.14.0", "ty>=0.0.8"]
+dev = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0", "pytest-cov>=4.0.0", "ruff>=0.14.0", "ty>=0.0.8", "pre-commit>=4.0.0"]
 browser = ["playwright>=1.40.0"]
 
 # =============================================================================
@@ -58,11 +70,11 @@ browser = ["playwright>=1.40.0"]
 # Target Python version (matches requires-python)
 target-version = "py313"
 
-# Line length - 88 is Black's default and widely adopted
-line-length = 88
+# Line length - 100 provides headroom for type annotations while staying readable
+line-length = 100
 
 # Source directory
-src = ["src"]
+src = ["src", "tests"]
 
 # Exclude directories from linting
 exclude = [
@@ -119,13 +131,21 @@ select = [
 
 # Rules to ignore (with explanations)
 ignore = [
-    # Allow TODO comments without issue links (practical for learning projects)
+    # Allow TODO comments without issue links
     "TD002", # Missing author in TODO
     "TD003", # Missing issue link in TODO
 
     # Sometimes we need broad exception handling
     "TRY003", # Avoid specifying long messages outside exception class
     "EM101",  # Exception must not use string literal
+
+    # Module/package-level docstrings not required (class and function level suffice)
+    "D100", # Missing docstring in public module
+    "D104", # Missing docstring in public package
+    "D107", # Missing docstring in __init__
+
+    # Allow Any type in annotations (necessary for third-party library interop)
+    "ANN401", # Dynamically typed expressions (Any)
 
     # These conflict with formatter or are too strict
     "D203", # one-blank-line-before-class (conflicts with D211)
@@ -170,9 +190,9 @@ ignore = [
 "**/extraction/schema.py" = ["E501"]  # Long description strings
 "**/extraction/prompts.py" = ["E501", "PLC0415"]  # Long prompt strings
 "**/postprocessing/*.py" = ["PLC0415", "E501", "RET504", "PLR0911", "PLR0912", "PLR0915", "PLR2004", "TRY400"]  # Cypher queries, complex taxonomy logic
-"**/graph/*.py" = ["PLC0415", "PLR0915", "ANN401", "SIM102"]
+"**/graph/*.py" = ["PLC0415", "PLR0915", "SIM102"]
 "**/validation/*.py" = ["PLC0415", "E501", "PLR2004", "PLR0912", "PLR0915", "RET504"]
-"**/loaders/*.py" = ["PLC0415", "ANN401", "RET504"]
+"**/loaders/*.py" = ["PLC0415", "RET504"]
 "**/chunking/*.py" = ["PLC0415"]
 "**/models/resource.py" = ["PLR2004"]  # Magic numbers for validation thresholds
 
@@ -241,11 +261,21 @@ python-version = "3.13"
 #   - invalid-assignment: Assigning wrong type to variable
 #   - invalid-return-type: Return value doesn't match annotation
 #
-# Downgrade BeautifulSoup-related false positives to warnings
-# (BeautifulSoup's loose typing causes many false positives)
+# Downgrade false positives from third-party libraries to warnings
+# (BeautifulSoup's loose typing and neo4j driver's async session typing)
 invalid-argument-type = "warn"
 no-matching-overload = "warn"
 possibly-missing-attribute = "warn"
+# neo4j driver's AsyncGraphDatabase.driver() return type
+invalid-return-type = "warn"
+# neo4j driver.session() async context manager support
+invalid-context-manager = "warn"
+# Dict subscript operators on dict[str, int | list] patterns
+unsupported-operator = "warn"
+# Playwright is an optional dependency (not always installed)
+unresolved-import = "warn"
+# hasattr() guard patterns for duck-typing
+call-non-callable = "warn"
 
 # =============================================================================
 # PYTEST CONFIGURATION
@@ -254,4 +284,20 @@ possibly-missing-attribute = "warn"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --tb=short"
+addopts = ["-ra", "-q"]
+
+# =============================================================================
+# COVERAGE CONFIGURATION
+# =============================================================================
+[tool.coverage.run]
+source = ["src/graphrag_kg_pipeline"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+fail_under = 60

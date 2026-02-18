@@ -95,9 +95,7 @@ class JamaGuideScraper:
 
     async def scrape_all(self) -> RequirementsManagementGuide:
         """Scrape the entire guide including all chapters and glossary."""
-        console.print(
-            "[bold blue]Starting Jama Requirements Management Guide Scraper[/]"
-        )
+        console.print("[bold blue]Starting Jama Requirements Management Guide Scraper[/]")
         mode = "browser (Playwright)" if self._use_browser else "httpx"
         console.print(
             f"Rate limit: {self._config.rate_limit_delay}s delay, "
@@ -158,9 +156,7 @@ class JamaGuideScraper:
                 if len(chapter_config.articles) <= 1:
                     html = await fetcher.fetch(chapter_config.overview_url)
                     if html:
-                        discovered = self.parser.discover_articles(
-                            html, chapter_config.slug
-                        )
+                        discovered = self.parser.discover_articles(html, chapter_config.slug)
                         if discovered:
                             console.print(
                                 f"  Found {len(discovered)} articles "
@@ -169,12 +165,8 @@ class JamaGuideScraper:
                             # Create new chapter config with discovered articles
                             new_articles = [ArticleConfig(0, "Overview", "")]
                             for i, art in enumerate(discovered, 1):
-                                new_articles.append(
-                                    ArticleConfig(i, art["title"], art["slug"])
-                                )
-                            current_chapter = replace(
-                                chapter_config, articles=new_articles
-                            )
+                                new_articles.append(ArticleConfig(i, art["title"], art["slug"]))
+                            current_chapter = replace(chapter_config, articles=new_articles)
 
                 updated_chapters.append(current_chapter)
                 progress.advance(task)
@@ -210,9 +202,7 @@ class JamaGuideScraper:
             task = progress.add_task("Scraping articles...", total=total_articles)
 
             for chapter_config in chapters_config:
-                chapter = await self._scrape_chapter(
-                    fetcher, chapter_config, progress, task
-                )
+                chapter = await self._scrape_chapter(fetcher, chapter_config, progress, task)
                 chapters.append(chapter)
 
         return chapters
@@ -322,9 +312,7 @@ class JamaGuideScraper:
 
         with open(path, "w", encoding="utf-8") as f:
             json.dump(
-                guide.model_dump(
-                    exclude={"raw_html"} if not self.include_raw_html else None
-                ),
+                guide.model_dump(exclude={"raw_html"} if not self.include_raw_html else None),
                 f,
                 indent=2,
                 default=str,  # Handle datetime
@@ -484,9 +472,7 @@ async def run_scraper(
 
     # Stage 4: Supplementary graph structure
     if not skip_supplementary:
-        await _build_supplementary_structure(
-            guide, output_dir, skip_resources=skip_resources
-        )
+        await _build_supplementary_structure(guide, output_dir, skip_resources=skip_resources)
 
     # Stage 5: Validation (optional)
     if run_validation:

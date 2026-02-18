@@ -400,7 +400,7 @@ ORDER BY mentions DESC
 
 ## Legal Notice
 
-This tool is for educational and research purposes. Please respect Jama Software's terms of service and use the scraped content responsibly. The content remains the intellectual property of Jama Software.
+The scraped content remains the intellectual property of Jama Software. Please respect their terms of service when using this pipeline. This project demonstrates a production-grade GraphRAG pipeline architecture and is not affiliated with Jama Software.
 
 ## License
 

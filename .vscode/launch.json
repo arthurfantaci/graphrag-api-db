@@ -9,6 +9,7 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "envFile": "${workspaceFolder}/.env",
       "justMyCode": true
     },
     {
@@ -19,6 +20,7 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "envFile": "${workspaceFolder}/.env",
       "args": []
     },
     {
@@ -28,7 +30,8 @@
       "program": "${workspaceFolder}/run.py",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
-      "env": { "PYTHONPATH": "${workspaceFolder}/src" }
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "envFile": "${workspaceFolder}/.env"
     },
     {
       "name": "Pytest: All Tests",
@@ -38,7 +41,8 @@
       "args": ["tests", "-v", "--tb=short"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
-      "env": { "PYTHONPATH": "${workspaceFolder}/src" }
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "envFile": "${workspaceFolder}/.env"
     },
     {
       "name": "Debug: Current File (Step Through)",
@@ -48,6 +52,7 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "envFile": "${workspaceFolder}/.env",
       "justMyCode": false
     }
   ]

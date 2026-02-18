@@ -66,7 +66,7 @@ uv run ty check src/         # Type check
 This project uses strict Python standards enforced by Ruff and ty:
 
 - **Python 3.13** - Latest language features
-- **Line length**: 88 characters (Black standard)
+- **Line length**: 100 characters
 - **Docstrings**: Google-style, required for all public functions
 - **Type annotations**: Required for all public functions
 - **Import sorting**: isort via Ruff

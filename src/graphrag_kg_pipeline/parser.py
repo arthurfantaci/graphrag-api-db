@@ -187,10 +187,7 @@ class HTMLParser:
                 continue
 
             # Get column headers
-            headers = [
-                th.get_text(strip=True).upper()
-                for th in header_row.find_all(["th", "td"])
-            ]
+            headers = [th.get_text(strip=True).upper() for th in header_row.find_all(["th", "td"])]
 
             # Check for expected columns
             if "TERM" not in headers or "DEFINITION" not in headers:
@@ -294,9 +291,7 @@ class HTMLParser:
         seen_slugs = set()
 
         # Find all internal links that match the chapter pattern
-        pattern = re.compile(
-            rf"/requirements-management-guide/{re.escape(chapter_slug)}/([^/]+)/?"
-        )
+        pattern = re.compile(rf"/requirements-management-guide/{re.escape(chapter_slug)}/([^/]+)/?")
 
         for link in soup.find_all("a", href=True):
             href = link["href"]
@@ -495,9 +490,7 @@ class HTMLParser:
 
             # Stop skipping when we hit a new non-promo heading
             is_heading = re.match(r"^#{1,4}\s+", line)
-            is_promo_heading = re.search(
-                r"(demo|trial|contact|pricing)", line, re.IGNORECASE
-            )
+            is_promo_heading = re.search(r"(demo|trial|contact|pricing)", line, re.IGNORECASE)
             if skip_until_next_section and is_heading and not is_promo_heading:
                 skip_until_next_section = False
 
@@ -515,9 +508,7 @@ class HTMLParser:
         result = re.sub(r"\n{3,}", "\n\n", result)
         return result.strip()
 
-    def _extract_cross_references(
-        self, elem: Tag, source_url: str
-    ) -> list[CrossReference]:
+    def _extract_cross_references(self, elem: Tag, source_url: str) -> list[CrossReference]:
         """Extract all links as cross-references.
 
         Handles both text links and image links (links wrapping images).
@@ -550,16 +541,12 @@ class HTMLParser:
             parsed = urlparse(full_url)
 
             # Check if internal
-            is_internal = (
-                parsed.netloc == source_domain or "jamasoftware.com" in parsed.netloc
-            )
+            is_internal = parsed.netloc == source_domain or "jamasoftware.com" in parsed.netloc
 
             # Try to extract section ID for internal links
             section_id = None
             if is_internal and "/requirements-management-guide/" in full_url:
-                match = re.search(
-                    r"/requirements-management-guide/([^/]+)/([^/]+)?", full_url
-                )
+                match = re.search(r"/requirements-management-guide/([^/]+)/([^/]+)?", full_url)
                 if match:
                     chapter_slug = match.group(1)
                     article_slug = match.group(2) or "overview"
@@ -694,9 +681,7 @@ class HTMLParser:
 
         return videos
 
-    def _inject_webinar_links(
-        self, elem: Tag, webinars: list[WebinarReference]
-    ) -> None:
+    def _inject_webinar_links(self, elem: Tag, webinars: list[WebinarReference]) -> None:
         """Inject webinar links into the HTML before markdown conversion.
 
         This ensures webinar URLs appear inline in the content where they belong,
@@ -745,9 +730,7 @@ class HTMLParser:
 
         # Pattern 2: Make "In This Webinar" headings clickable
         # Find all text containing "In This Webinar"
-        in_this_texts = elem.find_all(
-            string=re.compile(r"In This Webinar", re.IGNORECASE)
-        )
+        in_this_texts = elem.find_all(string=re.compile(r"In This Webinar", re.IGNORECASE))
         for text in in_this_texts:
             # Get parent heading element
             parent = text.find_parent(["h2", "h3", "h4", "h5", "h6", "p", "div"])
@@ -766,9 +749,7 @@ class HTMLParser:
             if not prev_sib:
                 continue
 
-            webinar_link = prev_sib.find(
-                "a", href=re.compile(r"/webinar/", re.IGNORECASE)
-            )
+            webinar_link = prev_sib.find("a", href=re.compile(r"/webinar/", re.IGNORECASE))
             if not webinar_link:
                 continue
 
@@ -813,9 +794,7 @@ class HTMLParser:
         )
 
         # First pass: Find "In This Webinar" descriptions
-        webinar_descriptions = self._find_webinar_descriptions(
-            elem, source_url, webinar_pattern
-        )
+        webinar_descriptions = self._find_webinar_descriptions(elem, source_url, webinar_pattern)
 
         # Second pass: Extract all webinar links
         for link in elem.find_all("a", href=True):
@@ -844,9 +823,7 @@ class HTMLParser:
         """
         descriptions: dict[str, str] = {}
 
-        in_this_texts = elem.find_all(
-            string=re.compile(r"In This Webinar", re.IGNORECASE)
-        )
+        in_this_texts = elem.find_all(string=re.compile(r"In This Webinar", re.IGNORECASE))
         for text in in_this_texts:
             desc_container = text.find_parent("div", class_=re.compile(r"flex_column"))
             if not desc_container:
@@ -916,9 +893,7 @@ class HTMLParser:
             context=context,
         )
 
-    def _extract_related_articles(
-        self, elem: Tag, source_url: str
-    ) -> list[RelatedArticle]:
+    def _extract_related_articles(self, elem: Tag, source_url: str) -> list[RelatedArticle]:
         """Extract explicitly marked related article callouts.
 
         Identifies "RELATED ARTICLE:" patterns in av_promobox elements,
@@ -1200,9 +1175,7 @@ class HTMLParser:
         if thead:
             header_row = thead.find("tr")
             if header_row:
-                headers = [
-                    th.get_text(strip=True) for th in header_row.find_all(["th", "td"])
-                ]
+                headers = [th.get_text(strip=True) for th in header_row.find_all(["th", "td"])]
                 rows.append("| " + " | ".join(headers) + " |")
                 rows.append("| " + " | ".join(["---"] * len(headers)) + " |")
 
@@ -1237,9 +1210,7 @@ class HTMLParser:
                             level=current_level,
                             content="\n\n".join(current_content).strip(),
                             cross_references=self._extract_cross_references(
-                                BeautifulSoup(
-                                    "".join(str(c) for c in current_content), "lxml"
-                                ),
+                                BeautifulSoup("".join(str(c) for c in current_content), "lxml"),
                                 source_url,
                             )
                             if current_content
@@ -1376,9 +1347,7 @@ class HTMLParser:
         # Look for definition-like patterns
         for text in elem.stripped_strings:
             # Pattern: "Term is ..." or "Term refers to ..."
-            match = re.match(
-                r"^([A-Z][a-zA-Z\s]+?)\s+(?:is|are|refers?\s+to|means?)\s+", text
-            )
+            match = re.match(r"^([A-Z][a-zA-Z\s]+?)\s+(?:is|are|refers?\s+to|means?)\s+", text)
             if match:
                 term = match.group(1).strip()
                 if len(term) < MAX_CONCEPT_LENGTH:

@@ -55,9 +55,7 @@ class ImageReference(BaseModel):
     alt_text: str = Field(default="", description="Alt text description of the image")
     title: str | None = Field(default=None, description="Title attribute if present")
     caption: str | None = Field(default=None, description="Figure caption if present")
-    context: str | None = Field(
-        default=None, description="Surrounding text context for the image"
-    )
+    context: str | None = Field(default=None, description="Surrounding text context for the image")
 
 
 class VideoReference(BaseModel):
@@ -66,13 +64,9 @@ class VideoReference(BaseModel):
     url: str = Field(description="Video URL (e.g., YouTube watch URL)")
     embed_url: str = Field(description="Embed URL for the video")
     video_id: str = Field(description="Video ID (e.g., YouTube video ID)")
-    platform: str = Field(
-        default="youtube", description="Video platform (youtube, vimeo, etc.)"
-    )
+    platform: str = Field(default="youtube", description="Video platform (youtube, vimeo, etc.)")
     title: str | None = Field(default=None, description="Video title if available")
-    context: str | None = Field(
-        default=None, description="Surrounding text context for the video"
-    )
+    context: str | None = Field(default=None, description="Surrounding text context for the video")
 
 
 class WebinarReference(BaseModel):
@@ -118,9 +112,7 @@ class Article(BaseModel):
     # Identification
     article_id: str = Field(description="Unique article ID (e.g., 'ch1-art3')")
     chapter_number: int = Field(description="Parent chapter number (1-15)")
-    article_number: int = Field(
-        description="Article number within chapter (0 for overview)"
-    )
+    article_number: int = Field(description="Article number within chapter (0 for overview)")
 
     # Content
     title: str = Field(description="Article title")
@@ -211,13 +203,9 @@ class GlossaryTerm(BaseModel):
     """A single glossary term and definition."""
 
     term: str = Field(description="The term being defined")
-    acronym: str | None = Field(
-        default=None, description="Acronym if applicable (e.g., 'AoA')"
-    )
+    acronym: str | None = Field(default=None, description="Acronym if applicable (e.g., 'AoA')")
     definition: str = Field(description="The definition text")
-    related_terms: list[str] = Field(
-        default_factory=list, description="Related glossary terms"
-    )
+    related_terms: list[str] = Field(default_factory=list, description="Related glossary terms")
     related_chapters: list[int] = Field(
         default_factory=list, description="Chapter numbers where this term is relevant"
     )
@@ -227,9 +215,7 @@ class Glossary(BaseModel):
     """The complete glossary."""
 
     url: str = Field(description="Source URL for glossary")
-    terms: list[GlossaryTerm] = Field(
-        default_factory=list, description="All glossary terms"
-    )
+    terms: list[GlossaryTerm] = Field(default_factory=list, description="All glossary terms")
     scraped_at: datetime = Field(default_factory=_utc_now)
 
     @computed_field
@@ -242,13 +228,9 @@ class Glossary(BaseModel):
 class GuideMetadata(BaseModel):
     """Metadata about the complete guide."""
 
-    title: str = Field(
-        default="The Essential Guide to Requirements Management and Traceability"
-    )
+    title: str = Field(default="The Essential Guide to Requirements Management and Traceability")
     publisher: str = Field(default="Jama Software")
-    base_url: str = Field(
-        default="https://www.jamasoftware.com/requirements-management-guide/"
-    )
+    base_url: str = Field(default="https://www.jamasoftware.com/requirements-management-guide/")
     scraped_at: datetime = Field(default_factory=_utc_now)
     scraper_version: str = Field(default="0.1.0")
     total_chapters: int = Field(default=15)

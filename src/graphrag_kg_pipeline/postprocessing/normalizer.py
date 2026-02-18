@@ -283,9 +283,7 @@ class EntityNormalizer:
 
         try:
             async with self.driver.session(database=self.database) as session:
-                await session.run(
-                    query, primary_id=primary_id, duplicate_id=duplicate_id
-                )
+                await session.run(query, primary_id=primary_id, duplicate_id=duplicate_id)
         except Exception as e:
             # Fallback without APOC if not available
             logger.warning(

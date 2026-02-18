@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint
+    name: Lint & Format Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +29,7 @@ jobs:
         run: uv sync --frozen
 
       - name: Run Ruff linter
-        run: uv run ruff check .
+        run: uv run ruff check . --output-format=github
 
       - name: Run Ruff formatter check
         run: uv run ruff format --check .
@@ -52,12 +52,12 @@ jobs:
         run: uv sync --frozen
 
       - name: Run ty type checker
-        run: uv run ty check src/
-        continue-on-error: true  # Type checking is advisory
+        run: uv run ty check src/ || true  # Advisory: exit 0 even if diagnostics found
 
   test:
     name: Test
     runs-on: ubuntu-latest
+    needs: [lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -74,10 +74,28 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short
+        env:
+          # Mock values for unit tests (real services not required)
+          NEO4J_URI: neo4j://localhost:7687
+          NEO4J_USERNAME: neo4j
+          NEO4J_PASSWORD: test
+          OPENAI_API_KEY: sk-test
 
       - name: Run tests with coverage
-        run: uv run pytest tests/ --cov=jama_scraper --cov-report=xml --cov-report=term-missing
-        continue-on-error: true  # Coverage is advisory
+        run: uv run pytest tests/ --cov=graphrag_kg_pipeline --cov-report=xml --cov-report=term-missing || true  # Advisory: coverage may not resolve src/ layout
+        env:
+          NEO4J_URI: neo4j://localhost:7687
+          NEO4J_USERNAME: neo4j
+          NEO4J_PASSWORD: test
+          OPENAI_API_KEY: sk-test
+          PYTHONPATH: src
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          fail_ci_if_error: false
 
   # Separate job for testing actual Neo4j integration (manual trigger)
   integration:
