@@ -207,9 +207,7 @@ class ValidationFixer:
         results = {}
 
         # Preview chunk_id fix
-        results["chunk_ids"] = await fix_missing_chunk_ids(
-            self.driver, self.database, dry_run=True
-        )
+        results["chunk_ids"] = await fix_missing_chunk_ids(self.driver, self.database, dry_run=True)
 
         # Preview plural entity fix
         results["plural_entities"] = await fix_plural_entities(
@@ -340,9 +338,7 @@ def format_fix_preview(preview: dict[str, Any]) -> str:
         lines.append("Generic entities to delete:")
         for entity in preview["generic_entities"]["entities"][:10]:
             rels = entity.get("relationship_count", 0)
-            lines.append(
-                f"  - {entity['label']}: {entity['name']} ({rels} relationships)"
-            )
+            lines.append(f"  - {entity['label']}: {entity['name']} ({rels} relationships)")
         if preview["generic_entities"]["would_delete"] > 10:
             remaining = preview["generic_entities"]["would_delete"] - 10
             lines.append(f"  ... and {remaining} more")
@@ -354,9 +350,7 @@ def format_fix_preview(preview: dict[str, Any]) -> str:
         for entity in preview["plural_entities"]["entities"][:10]:
             normalized = entity.get("normalized_name", "?")
             rels = entity.get("relationship_count", 0)
-            lines.append(
-                f"  - {entity['label']}: {entity['name']} → {normalized} ({rels} rels)"
-            )
+            lines.append(f"  - {entity['label']}: {entity['name']} → {normalized} ({rels} rels)")
         if preview["plural_entities"]["would_merge"] > 10:
             remaining = preview["plural_entities"]["would_merge"] - 10
             lines.append(f"  ... and {remaining} more")

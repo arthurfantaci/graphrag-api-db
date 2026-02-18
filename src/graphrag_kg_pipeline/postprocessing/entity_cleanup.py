@@ -432,9 +432,7 @@ class EntityCleanupNormalizer:
         Returns:
             List of entity dicts with name, label, and relationship counts.
         """
-        label_list = (
-            "[" + ", ".join(f"'{lbl}'" for lbl in LLM_EXTRACTED_ENTITY_LABELS) + "]"
-        )
+        label_list = "[" + ", ".join(f"'{lbl}'" for lbl in LLM_EXTRACTED_ENTITY_LABELS) + "]"
 
         query = f"""
         MATCH (n)
@@ -460,9 +458,7 @@ class EntityCleanupNormalizer:
         classified = self.classifier.classify_batch(entities)
 
         # Calculate delete impact
-        delete_impact = sum(
-            e.get("relationship_count", 0) for e in classified["to_delete"]
-        )
+        delete_impact = sum(e.get("relationship_count", 0) for e in classified["to_delete"])
 
         # Get plural/singular pairs dynamically (includes multi-word phrases)
         plural_pairs = await self.find_plural_singular_pairs()
@@ -495,12 +491,8 @@ class EntityCleanupNormalizer:
         Returns:
             Number of entities deleted.
         """
-        term_list = (
-            "[" + ", ".join(f"'{term}'" for term in GENERIC_TERMS_TO_DELETE) + "]"
-        )
-        label_list = (
-            "[" + ", ".join(f"'{lbl}'" for lbl in LLM_EXTRACTED_ENTITY_LABELS) + "]"
-        )
+        term_list = "[" + ", ".join(f"'{term}'" for term in GENERIC_TERMS_TO_DELETE) + "]"
+        label_list = "[" + ", ".join(f"'{lbl}'" for lbl in LLM_EXTRACTED_ENTITY_LABELS) + "]"
 
         query = f"""
         MATCH (n)
@@ -528,9 +520,7 @@ class EntityCleanupNormalizer:
         Returns:
             List of pairs with singular_name, plural_name, label, and element IDs.
         """
-        label_list = (
-            "[" + ", ".join(f"'{lbl}'" for lbl in LLM_EXTRACTED_ENTITY_LABELS) + "]"
-        )
+        label_list = "[" + ", ".join(f"'{lbl}'" for lbl in LLM_EXTRACTED_ENTITY_LABELS) + "]"
 
         query = f"""
         MATCH (singular)

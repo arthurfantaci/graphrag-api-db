@@ -67,9 +67,7 @@ class JamaKGPipelineConfig:
     embedding_dimensions: int = 1536
 
     # Chunking configuration
-    chunking_config: HierarchicalChunkingConfig = field(
-        default_factory=HierarchicalChunkingConfig
-    )
+    chunking_config: HierarchicalChunkingConfig = field(default_factory=HierarchicalChunkingConfig)
 
     # Pipeline settings
     batch_size: int = 10

@@ -34,9 +34,7 @@ def create_text_splitter_adapter(
 
     Example:
         >>> from graphrag_kg_pipeline.chunking import create_text_splitter_adapter
-        >>> splitter = create_text_splitter_adapter(
-        ...     HierarchicalChunkingConfig.for_rag()
-        ... )
+        >>> splitter = create_text_splitter_adapter(HierarchicalChunkingConfig.for_rag())
         >>> # Use with SimpleKGPipeline
         >>> pipeline = SimpleKGPipeline(..., text_splitter=splitter)
     """
@@ -46,10 +44,7 @@ def create_text_splitter_adapter(
 
     config = config or HierarchicalChunkingConfig()
 
-    if use_markdown:
-        splitter = MarkdownSplitter(config)
-    else:
-        splitter = HierarchicalHTMLSplitter(config)
+    splitter = MarkdownSplitter(config) if use_markdown else HierarchicalHTMLSplitter(config)
 
     return LangChainTextSplitterAdapter(splitter)
 
