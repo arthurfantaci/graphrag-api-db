@@ -217,6 +217,18 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 
 ## Key Design Decisions
 
+**Neo4j Constraint Compatibility:**
+- neo4j_graphrag 1.13.0+ uses `CREATE` + `apoc.create.addLabels()`, NOT `MERGE` for entities
+- Entity-type uniqueness constraints (Concept.name, Challenge.name, etc.) MUST NOT exist — they cause silent batch rollbacks via IndexEntryConflictException
+- Only structural constraints are safe: Article, Chunk, Chapter, Image, Video, Webinar, Definition
+- Entity deduplication is handled by neo4j_graphrag's entity resolution step
+
+**Pipeline Runtime:**
+- Full re-ingestion: ~1.5 hours (101 articles, ~1 article/min)
+- No built-in graph clear command — use `MATCH (n) DETACH DELETE n` manually
+- Rich progress bars don't flush to redirected output; monitor via Neo4j node count queries
+- Direct OpenAI API calls (gleaning, context enricher) need `response_format={"type": "json_object"}`
+
 **Scraping Layer:**
 - **Protocol Pattern (PEP 544)** - Structural subtyping for fetcher abstraction enables testing and extensibility
 - **Strategy Pattern** - Swappable fetching strategies (httpx vs Playwright) via `create_fetcher()` factory
@@ -237,3 +249,5 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - **Validation Framework** - Comprehensive checks for orphans, duplicates, and invalid patterns
 - **Repair Operations** - Safe fixes with dry-run preview mode
 - **Vector Embeddings** - OpenAI text-embedding-3-small for semantic search
+- **Fix ordering** - delete degenerate → re-index → chunk_ids → webinar titles → relabel → backfill MENTIONED_IN → definitions → generic → plurals
+- **Pass/fail checks** - orphan_chunks, duplicates, chunk_ids, chunk_index, plural_duplicates (industry count advisory)
