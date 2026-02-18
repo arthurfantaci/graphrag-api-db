@@ -83,7 +83,7 @@ jobs:
           OPENAI_API_KEY: sk-test
 
       - name: Run tests with coverage
-        run: uv run pytest tests/ --cov=src/graphrag_kg_pipeline --cov-report=xml --cov-report=term-missing
+        run: uv run pytest tests/ --cov=graphrag_kg_pipeline --cov-report=xml --cov-report=term-missing
         continue-on-error: true  # Coverage is advisory
         env:
           NEO4J_URI: neo4j://localhost:7687
@@ -95,7 +95,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: coverage.xml
+          files: coverage.xml
           fail_ci_if_error: false
 
   # Separate job for testing actual Neo4j integration (manual trigger)

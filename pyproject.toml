@@ -261,11 +261,21 @@ python-version = "3.13"
 #   - invalid-assignment: Assigning wrong type to variable
 #   - invalid-return-type: Return value doesn't match annotation
 #
-# Downgrade BeautifulSoup-related false positives to warnings
-# (BeautifulSoup's loose typing causes many false positives)
+# Downgrade false positives from third-party libraries to warnings
+# (BeautifulSoup's loose typing and neo4j driver's async session typing)
 invalid-argument-type = "warn"
 no-matching-overload = "warn"
 possibly-missing-attribute = "warn"
+# neo4j driver's AsyncGraphDatabase.driver() return type
+invalid-return-type = "warn"
+# neo4j driver.session() async context manager support
+invalid-context-manager = "warn"
+# Dict subscript operators on dict[str, int | list] patterns
+unsupported-operator = "warn"
+# Playwright is an optional dependency (not always installed)
+unresolved-import = "warn"
+# hasattr() guard patterns for duck-typing
+call-non-callable = "warn"
 
 # =============================================================================
 # PYTEST CONFIGURATION
