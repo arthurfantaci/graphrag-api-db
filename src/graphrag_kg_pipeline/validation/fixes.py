@@ -293,9 +293,7 @@ async def fix_mislabeled_entities(
 
         async with driver.session(database=database) as session:
             try:
-                result = await session.run(
-                    relabel_query, element_id=entity["element_id"]
-                )
+                result = await session.run(relabel_query, element_id=entity["element_id"])
                 record = await result.single()
                 if record and record["relabeled"] > 0:
                     stats["relabeled"] += 1
@@ -624,9 +622,7 @@ class ValidationFixer:
         results["chunk_index"] = await fix_missing_chunk_index(
             self.driver, self.database, dry_run=True
         )
-        results["chunk_ids"] = await fix_missing_chunk_ids(
-            self.driver, self.database, dry_run=True
-        )
+        results["chunk_ids"] = await fix_missing_chunk_ids(self.driver, self.database, dry_run=True)
         results["webinar_titles"] = await fix_truncated_webinar_titles(
             self.driver, self.database, dry_run=True
         )
@@ -804,9 +800,7 @@ def format_fix_preview(preview: dict[str, Any]) -> str:
         for entity in preview["plural_entities"]["entities"][:10]:
             normalized = entity.get("normalized_name", "?")
             rels = entity.get("relationship_count", 0)
-            lines.append(
-                f"  - {entity['label']}: {entity['name']} -> {normalized} ({rels} rels)"
-            )
+            lines.append(f"  - {entity['label']}: {entity['name']} -> {normalized} ({rels} rels)")
         if preview["plural_entities"]["would_merge"] > 10:
             remaining = preview["plural_entities"]["would_merge"] - 10
             lines.append(f"  ... and {remaining} more")
