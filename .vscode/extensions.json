@@ -2,21 +2,35 @@
   "recommendations": [
     // Core Python development
     "ms-python.python",
-    "ms-python.pylance",
+    "ms-python.vscode-pylance",
     "ms-python.debugpy",
 
     // Linting & Formatting (Ruff replaces black, isort, flake8, pylint)
     "charliermarsh.ruff",
 
+    // Neo4j & Cypher
+    "jakeboone02.cypher-query-language",
+
+    // API Development
+    "humao.rest-client",
+
     // Configuration file support
     "mikestead.dotenv",
     "tamasfe.even-better-toml",
+    "esbenp.prettier-vscode",
+
+    // Git
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
 
     // Productivity
-    "eamodio.gitlens",
     "usernamehw.errorlens",
+    "christian-kohler.path-intellisense",
     "oderwat.indent-rainbow",
-    "njpwerner.autodocstring"
+    "njpwerner.autodocstring",
+
+    // Docker
+    "ms-azuretools.vscode-docker"
   ],
   "unwantedRecommendations": [
     // Deprecated: Ruff replaces these
