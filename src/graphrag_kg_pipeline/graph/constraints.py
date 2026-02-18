@@ -19,18 +19,14 @@ logger = structlog.get_logger(__name__)
 # =============================================================================
 
 # Uniqueness constraints for node types
+#
+# NOTE: Entity type constraints (Concept, Challenge, etc.) are intentionally
+# omitted. neo4j_graphrag 1.13+ uses CREATE with __KGBuilder__ label followed
+# by apoc.create.addLabels() to add type labels. Per-type uniqueness constraints
+# cause IndexEntryConflictException when the same entity name appears across
+# multiple extraction batches, rolling back entire batch transactions.
+# Entity deduplication is handled by neo4j_graphrag's entity resolution step.
 UNIQUENESS_CONSTRAINTS = [
-    # Core entity types
-    ("Concept", "name"),
-    ("Challenge", "name"),
-    ("Artifact", "name"),
-    ("Bestpractice", "name"),
-    ("Processstage", "name"),
-    ("Role", "name"),
-    ("Standard", "name"),
-    ("Tool", "name"),
-    ("Methodology", "name"),
-    ("Industry", "name"),
     # Lexical graph nodes
     ("Article", "article_id"),
     ("Chunk", "chunk_id"),

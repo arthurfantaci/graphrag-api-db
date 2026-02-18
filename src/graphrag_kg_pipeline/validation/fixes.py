@@ -657,6 +657,8 @@ class ValidationFixer:
             "entities_to_delete": results["generic_entities"]["would_delete"],
         }
 
+        results["summary"]["total_changes"] = sum(results["summary"].values())
+
         return results
 
     async def apply_all_fixes(self) -> dict[str, Any]:

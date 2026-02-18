@@ -111,9 +111,16 @@ class ExtractionGleaner:
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,
                     max_tokens=2000,
+                    response_format={"type": "json_object"},
                 )
 
                 content = response.choices[0].message.content or "{}"
+                # Strip markdown code fences if present (fallback)
+                if content.startswith("```"):
+                    content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+                    if content.endswith("```"):
+                        content = content[:-3]
+                    content = content.strip()
                 result = json.loads(content)
 
                 new_nodes = result.get("nodes", [])
