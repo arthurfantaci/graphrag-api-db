@@ -23,6 +23,7 @@ MIN_CONCEPT_LENGTH = 2
 MAX_CONCEPT_LENGTH = 50
 MAX_KEY_CONCEPTS = 20
 MIN_CONTENT_ELEMENTS = 2
+MIN_TITLE_LENGTH = 10
 
 # Tags to remove during HTML cleaning (contain no meaningful content)
 # Note: iframe is NOT included - YouTube embeds are valuable content
@@ -864,18 +865,36 @@ class HTMLParser:
         img = link.find("img")
         if img:
             if not text:
-                text = img.get("title", "") or img.get("alt", "") or ""
-                text = text.strip()
+                # Only accept img title/alt if substantive (>10 chars)
+                img_title = (img.get("title", "") or "").strip()
+                img_alt = (img.get("alt", "") or "").strip()
+                candidate = img_title or img_alt
+                if len(candidate) > MIN_TITLE_LENGTH:
+                    text = candidate
 
             # Get thumbnail (prefer actual URL over lazy-load placeholder)
             thumb = img.get("data-lazy-src") or img.get("data-src") or img.get("src")
             if thumb and not thumb.startswith("data:"):
                 thumbnail_url = urljoin(source_url, thumb)
 
-        # Extract title from URL if no text
+        # Extract title from URL slug if no text
         if not text:
             match = re.search(r"/webinar/([^/?#]+)", href)
-            text = match.group(1).replace("-", " ").title() if match else "Webinar"
+            if match:
+                text = "Webinar: " + match.group(1).replace("-", " ").title()
+
+        # Fallback: check nearest sibling <p> text
+        if not text:
+            next_p = link.find_next_sibling("p")
+            if next_p:
+                p_text = next_p.get_text(strip=True)
+                if len(p_text) > MIN_TITLE_LENGTH:
+                    # Use first sentence as title
+                    text = p_text.split(".")[0].strip()
+
+        # Last resort
+        if not text:
+            text = "Webinar"
 
         # Get context (nearest heading, but not "In This Webinar")
         context = None

@@ -187,8 +187,7 @@ class TestHeaderMetadataPrepending:
         )
 
         html = (
-            "<h2>Section Title</h2>"
-            "<p>" + "Some meaningful content here for testing. " * 10 + "</p>"
+            "<h2>Section Title</h2><p>" + "Some meaningful content here for testing. " * 10 + "</p>"
         )
 
         config = HierarchicalChunkingConfig(min_chunk_size=50)

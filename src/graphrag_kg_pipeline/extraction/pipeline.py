@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from neo4j import Driver
     from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
 
+    from graphrag_kg_pipeline.extraction.gleaning import ExtractionGleaner
     from graphrag_kg_pipeline.models import Glossary, RequirementsManagementGuide
 
 logger = structlog.get_logger(__name__)
@@ -72,6 +73,11 @@ class JamaKGPipelineConfig:
     # Pipeline settings
     batch_size: int = 10
     perform_entity_resolution: bool = True
+
+    # Quality enhancement settings
+    enable_contextual_retrieval: bool = True
+    enable_gleaning: bool = True
+    gleaning_passes: int = 1
 
     # Graph labels
     document_node_label: str = "Article"
@@ -293,6 +299,9 @@ async def process_article_with_pipeline(
     article_id: str,
     markdown_content: str,
     article_metadata: dict[str, Any],
+    *,
+    gleaner: "ExtractionGleaner | None" = None,
+    gleaning_passes: int = 1,
 ) -> dict[str, Any]:
     """Process a single article through the pipeline.
 
@@ -301,6 +310,8 @@ async def process_article_with_pipeline(
         article_id: Article identifier.
         markdown_content: Article content in markdown format.
         article_metadata: Additional metadata to attach.
+        gleaner: Optional gleaner for multi-pass extraction.
+        gleaning_passes: Number of gleaning passes (default: 1).
 
     Returns:
         Processing result with statistics.
@@ -317,10 +328,31 @@ async def process_article_with_pipeline(
             },
         )
 
+        # Run gleaning passes to catch missed entities/relationships
+        gleaning_stats = None
+        if gleaner:
+            try:
+                for _pass in range(gleaning_passes):
+                    gleaning_stats = await gleaner.glean_article(article_id)
+                    logger.info(
+                        "Gleaning pass complete",
+                        article_id=article_id,
+                        pass_number=_pass + 1,
+                        new_entities=gleaning_stats.get("new_entities", 0),
+                        new_relationships=gleaning_stats.get("new_relationships", 0),
+                    )
+            except Exception:
+                logger.warning(
+                    "Gleaning failed, continuing without gleaned entities",
+                    article_id=article_id,
+                    exc_info=True,
+                )
+
         return {
             "article_id": article_id,
             "status": "success",
             "result": result,
+            "gleaning": gleaning_stats,
         }
 
     except Exception as e:
@@ -369,6 +401,20 @@ async def process_guide_with_pipeline(
     # Create pipeline
     pipeline = create_jama_kg_pipeline(config)
 
+    # Create gleaner (reused across all articles to avoid per-article driver creation)
+    gleaner = None
+    async_driver = None
+    if config.enable_gleaning:
+        from graphrag_kg_pipeline.extraction.gleaning import ExtractionGleaner
+
+        async_driver = create_async_neo4j_driver(config)
+        gleaner = ExtractionGleaner(
+            driver=async_driver,
+            database=config.neo4j_database,
+            openai_api_key=config.openai_api_key,
+            model=config.llm_model,
+        )
+
     # Track statistics
     stats = {
         "total_articles": guide.total_articles,
@@ -398,6 +444,8 @@ async def process_guide_with_pipeline(
                     article_id=article.article_id,
                     markdown_content=article.markdown_content,
                     article_metadata=metadata,
+                    gleaner=gleaner,
+                    gleaning_passes=config.gleaning_passes,
                 )
 
                 stats["processed"] += 1
@@ -441,6 +489,8 @@ async def process_guide_with_pipeline(
                 article_id="glossary",
                 markdown_content=glossary_markdown,
                 article_metadata=glossary_metadata,
+                gleaner=gleaner,
+                gleaning_passes=config.gleaning_passes,
             )
 
             stats["processed"] += 1
@@ -466,6 +516,8 @@ async def process_guide_with_pipeline(
         # Close pipeline resources
         if hasattr(pipeline, "close"):
             await pipeline.close()
+        if async_driver:
+            await async_driver.close()
 
     return stats
 
