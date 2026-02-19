@@ -26,14 +26,14 @@ class VoyageAIEmbeddings(Embedder):
     Attributes:
         model: Voyage AI model name (default: voyage-4).
         input_type: Embedding input type ("document" for indexing, "query" for search).
-        dimensions: Output embedding dimensions (default: 1536 to match existing index).
+        dimensions: Output embedding dimensions (default: 1024).
     """
 
     def __init__(
         self,
         model: str = "voyage-4",
         input_type: str = "document",
-        dimensions: int = 1536,
+        dimensions: int = 1024,
         **kwargs: Any,
     ) -> None:
         """Initialize the Voyage AI embedder.
@@ -41,7 +41,7 @@ class VoyageAIEmbeddings(Embedder):
         Args:
             model: Model name (default: voyage-4).
             input_type: Either "document" (for indexing) or "query" (for search).
-            dimensions: Output vector dimensions (default: 1536).
+            dimensions: Output vector dimensions (default: 1024).
             **kwargs: Additional arguments passed to Voyage AI client.
         """
         super().__init__()

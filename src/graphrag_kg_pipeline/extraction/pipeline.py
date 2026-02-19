@@ -61,7 +61,7 @@ class JamaKGPipelineConfig:
     openai_api_key: str = ""
     llm_model: str = "gpt-4o"
     embedding_model: str = "text-embedding-3-small"
-    embedding_dimensions: int = 1536
+    embedding_dimensions: int = 1024
 
     # Voyage AI configuration (optional — auto-detected from VOYAGE_API_KEY)
     voyage_api_key: str = ""
