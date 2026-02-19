@@ -221,7 +221,7 @@ class LangExtractAugmenter:
             MATCH (c:Chunk)
             WHERE c.text IS NOT NULL AND size(c.text) > 50
             RETURN elementId(c) AS id, c.text AS text
-            ORDER BY c.chunk_index
+            ORDER BY c.index
             {limit_clause}
         """
         chunks = []
