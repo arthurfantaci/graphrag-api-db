@@ -109,9 +109,12 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 │                              ↓                                           │
 │  Stage 3: NORMALIZE (Entity Post-Processing)                            │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ IndustryNormalizer (18 canonical) → EntityNormalizer (dedupe)      │  │
-│  │ - Plural entity merging (requirement vs requirements)              │  │
-│  │ - Generic entity cleanup                                           │  │
+│  │ 1. EntityNormalizer.normalize_all_entities() — lowercase + trim   │  │
+│  │ 2. EntityNormalizer.deduplicate_by_name() — merge duplicates      │  │
+│  │ 3. EntityCleanupNormalizer.run_cleanup() — generics + plurals     │  │
+│  │ 4. IndustryNormalizer.consolidate_industries() — 100+ → 18       │  │
+│  │ 5. MentionedInBackfiller.backfill() — MENTIONED_IN + APPLIES_TO  │  │
+│  │ 6. EntitySummarizer.summarize() — LLM entity descriptions        │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                              ↓                                           │
 │  Stage 4: SUPPLEMENT (Graph Structure)                                   │
@@ -194,26 +197,30 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 
 **Post-Processing (Stage 3):**
 
-11. **postprocessing/industry_taxonomy.py** - `IndustryNormalizer` consolidates 100+ variants to 18 canonical industries.
+11. **postprocessing/normalizer.py** - `EntityNormalizer`: name normalization (lowercase, trim) and duplicate merging.
 
-12. **postprocessing/entity_cleanup.py** - Plural/singular deduplication, generic entity removal.
+12. **postprocessing/entity_cleanup.py** - `EntityCleanupNormalizer`: generic entity deletion, plural-to-singular merging.
 
-13. **postprocessing/normalizer.py** - `EntityNormalizer` for entity deduplication.
+13. **postprocessing/industry_taxonomy.py** - `IndustryNormalizer` consolidates 100+ variants to 18 canonical industries.
+
+14. **postprocessing/mentioned_in_backfill.py** - `MentionedInBackfiller`: creates MENTIONED_IN and APPLIES_TO relationships.
+
+15. **postprocessing/entity_summarizer.py** - `EntitySummarizer`: LLM-generated entity descriptions.
 
 **Graph Building (Stage 4):**
 
-14. **graph/supplementary.py** - `SupplementaryGraphBuilder`:
+16. **graph/supplementary.py** - `SupplementaryGraphBuilder`:
     - Chapter structure, Resource nodes, Glossary-to-concept linking
 
-15. **graph/constraints.py** - `ConstraintManager` for Neo4j indexes and constraints.
+17. **graph/constraints.py** - `ConstraintManager` for Neo4j indexes and constraints.
 
 **Validation (Stage 5):**
 
-16. **validation/queries.py** - `ValidationQueries` class with Cypher checks.
+18. **validation/queries.py** - `ValidationQueries` class with Cypher checks.
 
-17. **validation/fixes.py** - `ValidationFixer` for data repair operations.
+19. **validation/fixes.py** - `ValidationFixer` for data repair operations.
 
-18. **validation/reporter.py** - `ValidationReporter` for report generation.
+20. **validation/reporter.py** - `ValidationReporter` for report generation.
 
 ## Key Design Decisions
 
@@ -227,7 +234,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - Full re-ingestion: ~1.5 hours (101 articles, ~1 article/min)
 - No built-in graph clear command — use `MATCH (n) DETACH DELETE n` manually
 - Rich progress bars don't flush to redirected output; monitor via Neo4j node count queries
-- Direct OpenAI API calls (gleaning, context enricher) need `response_format={"type": "json_object"}`
+- Direct OpenAI API calls (gleaning) need `response_format={"type": "json_object"}`
 
 **Scraping Layer:**
 - **Protocol Pattern (PEP 544)** - Structural subtyping for fetcher abstraction enables testing and extensibility

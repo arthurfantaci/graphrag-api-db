@@ -133,23 +133,6 @@ class TestHierarchicalHTMLSplitter:
         assert isinstance(chunks, list)
         assert len(chunks) == 0
 
-    def test_split_with_positions(self, sample_article_html_with_headers: str) -> None:
-        """Test that split_text_with_positions returns position tuples."""
-        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
-            HierarchicalHTMLSplitter,
-        )
-
-        splitter = HierarchicalHTMLSplitter()
-
-        results = splitter.split_text_with_positions(sample_article_html_with_headers)
-
-        # Should return list of tuples
-        assert len(results) > 0
-        for item in results:
-            assert len(item) == 3
-            doc, _start, _end = item
-            assert hasattr(doc, "page_content")
-
 
 class TestHeaderMetadataPrepending:
     """Tests for header metadata prepending to chunk text."""

@@ -18,10 +18,6 @@ from graphrag_kg_pipeline.chunking.adapter import create_text_splitter_adapter
 from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
 from graphrag_kg_pipeline.extraction.prompts import create_extraction_template
 from graphrag_kg_pipeline.extraction.schema import get_schema_for_pipeline
-from graphrag_kg_pipeline.postprocessing.entity_cleanup import (
-    is_generic_term,
-    normalize_to_singular,
-)
 
 if TYPE_CHECKING:
     from neo4j import Driver
@@ -75,7 +71,6 @@ class JamaKGPipelineConfig:
     perform_entity_resolution: bool = True
 
     # Quality enhancement settings
-    enable_contextual_retrieval: bool = True
     enable_gleaning: bool = True
     gleaning_passes: int = 1
 
@@ -518,113 +513,5 @@ async def process_guide_with_pipeline(
             await pipeline.close()
         if async_driver:
             await async_driver.close()
-
-    return stats
-
-
-def validate_extracted_entities(entities: list[dict]) -> list[dict]:
-    """Filter and normalize extracted entities before writing to Neo4j.
-
-    This function provides a defense-in-depth layer against LLM extraction
-    errors. Even with careful prompting, LLMs sometimes extract generic
-    terms or plural forms that should be normalized.
-
-    Args:
-        entities: List of entity dictionaries from LLM extraction.
-            Expected keys: 'name', 'label', and optional properties.
-
-    Returns:
-        Filtered and normalized list of entities.
-
-    Example:
-        >>> entities = [
-        ...     {"name": "requirements", "label": "Concept"},
-        ...     {"name": "tool", "label": "Tool"},
-        ...     {"name": "traceability", "label": "Concept"},
-        ... ]
-        >>> result = validate_extracted_entities(entities)
-        >>> # "requirements" normalized to "requirement"
-        >>> # "tool" filtered out (too generic)
-        >>> # "traceability" kept as-is
-    """
-    filtered = []
-    stats = {"kept": 0, "filtered_generic": 0, "normalized": 0}
-
-    for entity in entities:
-        name = entity.get("name", "")
-        if not name:
-            continue
-
-        normalized_name = name.lower().strip()
-
-        # Skip generic terms
-        if is_generic_term(normalized_name):
-            stats["filtered_generic"] += 1
-            label = entity.get("label", "")
-            logger.debug("Filtered generic entity", name=name, label=label)
-            continue
-
-        # Normalize plurals to singulars
-        singular_name = normalize_to_singular(normalized_name)
-        if singular_name != normalized_name:
-            normalized_entity = entity.copy()  # Don't mutate original
-            normalized_entity["name"] = singular_name
-            # Preserve display_name if it was the plural form
-            if "display_name" in normalized_entity:
-                # Capitalize the singular form for display
-                normalized_entity["display_name"] = singular_name.title()
-            stats["normalized"] += 1
-            logger.debug(
-                "Normalized plural entity",
-                original=name,
-                normalized=singular_name,
-            )
-            filtered.append(normalized_entity)
-        else:
-            filtered.append(entity)
-        stats["kept"] += 1
-
-    if stats["filtered_generic"] > 0 or stats["normalized"] > 0:
-        logger.info(
-            "Entity validation complete",
-            kept=stats["kept"],
-            filtered_generic=stats["filtered_generic"],
-            normalized=stats["normalized"],
-        )
-
-    return filtered
-
-
-async def run_post_extraction_cleanup(
-    driver: "Driver",
-    database: str = "neo4j",
-) -> dict[str, Any]:
-    """Run post-extraction cleanup on the knowledge graph.
-
-    This should be called after all articles have been processed through
-    the SimpleKGPipeline. It cleans up any entities that slipped through
-    despite our prompt instructions.
-
-    Args:
-        driver: Neo4j async driver instance.
-        database: Database name.
-
-    Returns:
-        Cleanup statistics.
-    """
-    from graphrag_kg_pipeline.postprocessing.entity_cleanup import (
-        EntityCleanupNormalizer,
-    )
-
-    logger.info("Running post-extraction entity cleanup")
-
-    normalizer = EntityCleanupNormalizer(driver, database)
-    stats = await normalizer.run_cleanup()
-
-    logger.info(
-        "Post-extraction cleanup complete",
-        deleted=stats["deleted_generic"],
-        merged=stats["merged_plurals"],
-    )
 
     return stats

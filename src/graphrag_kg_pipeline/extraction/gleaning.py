@@ -214,10 +214,25 @@ class ExtractionGleaner:
             nodes: New entity nodes from gleaning.
             relationships: New relationships from gleaning.
         """
+        from graphrag_kg_pipeline.extraction.schema import NODE_TYPES, RELATIONSHIP_TYPES
+
+        allowed_labels = set(NODE_TYPES.keys())
+        allowed_rel_types = set(RELATIONSHIP_TYPES.keys()) | {"MENTIONED_IN", "RELATED_TO"}
+
         for node in nodes:
             label = node.get("label", "Concept")
             name = node.get("name", "").lower().strip()
             if not name:
+                continue
+
+            # Validate label against schema to prevent Cypher injection
+            if label not in allowed_labels:
+                logger.warning(
+                    "Skipping gleaned entity with invalid label",
+                    name=name,
+                    label=label,
+                    allowed=list(allowed_labels),
+                )
                 continue
 
             # Build properties
@@ -251,6 +266,17 @@ class ExtractionGleaner:
             rel_type = rel.get("type", "RELATED_TO")
 
             if not source or not target:
+                continue
+
+            # Validate relationship type against schema to prevent Cypher injection
+            if rel_type not in allowed_rel_types:
+                logger.warning(
+                    "Skipping gleaned relationship with invalid type",
+                    source=source,
+                    target=target,
+                    rel_type=rel_type,
+                    allowed=list(allowed_rel_types),
+                )
                 continue
 
             query = f"""
