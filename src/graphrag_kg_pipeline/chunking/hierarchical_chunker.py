@@ -139,36 +139,6 @@ class HierarchicalHTMLSplitter:
 
         return result
 
-    def split_text_with_positions(self, html_content: str) -> list[tuple["Document", int, int]]:
-        """Split HTML content and track character positions.
-
-        Like split_text but also returns start/end character positions
-        in the original content, useful for entity linking.
-
-        Args:
-            html_content: HTML string to split.
-
-        Returns:
-            List of (Document, start_pos, end_pos) tuples.
-        """
-        chunks = self.split_text_as_documents(html_content)
-        result = []
-
-        # Track positions by finding each chunk's content in original
-        search_start = 0
-        for chunk in chunks:
-            content = chunk.page_content
-            # Find position in remaining content
-            pos = html_content.find(content, search_start)
-            if pos >= 0:
-                result.append((chunk, pos, pos + len(content)))
-                search_start = pos + len(content)
-            else:
-                # Fallback if exact match not found (due to splitting transformations)
-                result.append((chunk, -1, -1))
-
-        return result
-
 
 class MarkdownSplitter:
     """Simple markdown splitter without HTML preprocessing.

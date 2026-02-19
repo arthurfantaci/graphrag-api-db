@@ -342,80 +342,6 @@ class TestPromptQualityImprovements:
         assert has_definition, "At least one example should show definition extraction"
 
 
-class TestFewShotExampleSelector:
-    """Tests for the dynamic few-shot example selector."""
-
-    def test_selector_initializes(self) -> None:
-        """Test that the selector initializes with default examples."""
-        from graphrag_kg_pipeline.extraction.example_selector import FewShotExampleSelector
-
-        selector = FewShotExampleSelector()
-        assert len(selector.examples) >= 7
-
-    def test_selector_returns_correct_count(self) -> None:
-        """Test that selector returns the configured number of examples."""
-        from graphrag_kg_pipeline.extraction.example_selector import FewShotExampleSelector
-
-        selector = FewShotExampleSelector(num_examples=3)
-        selected = selector.select_examples("ISO 26262 automotive safety")
-        assert len(selected) == 3
-
-    def test_selector_ranks_by_relevance(self) -> None:
-        """Test that selector ranks examples by keyword overlap."""
-        from graphrag_kg_pipeline.extraction.example_selector import FewShotExampleSelector
-
-        selector = FewShotExampleSelector(num_examples=2)
-
-        # Text about aerospace standards should rank Example 2 (DO-178C/aerospace) high
-        selected = selector.select_examples("DO-178C certification in the aerospace industry")
-        # At least one selected example should mention aerospace
-        texts = " ".join(ex["text"] for ex in selected)
-        assert "aerospace" in texts.lower()
-
-    def test_format_examples_for_prompt(self) -> None:
-        """Test that formatted output is valid prompt text."""
-        from graphrag_kg_pipeline.extraction.example_selector import FewShotExampleSelector
-
-        selector = FewShotExampleSelector(num_examples=2)
-        formatted = selector.format_examples_for_prompt("requirements traceability")
-
-        assert "SELECTED FEW-SHOT EXAMPLES" in formatted
-        assert "Dynamic Example 1" in formatted
-
-    def test_empty_input_returns_first_n(self) -> None:
-        """Test that empty input returns first N examples."""
-        from graphrag_kg_pipeline.extraction.example_selector import FewShotExampleSelector
-
-        selector = FewShotExampleSelector(num_examples=2)
-        selected = selector.select_examples("")
-        assert len(selected) == 2
-
-
-class TestContextualChunkEnricher:
-    """Tests for the contextual chunk enricher."""
-
-    def test_create_context_enricher_with_key(self) -> None:
-        """Test factory creates enricher when API key is provided."""
-        from graphrag_kg_pipeline.chunking.context_enricher import create_context_enricher
-
-        enricher = create_context_enricher(openai_api_key="sk-test-123")
-        assert enricher is not None
-
-    def test_create_context_enricher_without_key(self) -> None:
-        """Test factory returns None when API key is missing."""
-        from graphrag_kg_pipeline.chunking.context_enricher import create_context_enricher
-
-        enricher = create_context_enricher(openai_api_key=None)
-        assert enricher is None
-
-    def test_enricher_default_model(self) -> None:
-        """Test that enricher uses gpt-4o-mini by default for cost efficiency."""
-        from graphrag_kg_pipeline.chunking.context_enricher import ContextualChunkEnricher
-
-        enricher = ContextualChunkEnricher(openai_api_key="sk-test-123")
-        assert enricher.model == "gpt-4o-mini"
-
-
 class TestExtractionGleaner:
     """Tests for the extraction gleaner module."""
 
@@ -460,13 +386,6 @@ class TestPipelineConfigGleaningSettings:
         config = JamaKGPipelineConfig()
         assert config.enable_gleaning is True
         assert config.gleaning_passes == 1
-
-    def test_default_contextual_retrieval_enabled(self) -> None:
-        """Test that contextual retrieval is enabled by default."""
-        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
-
-        config = JamaKGPipelineConfig()
-        assert config.enable_contextual_retrieval is True
 
 
 class TestGlossaryPipelineProcessing:

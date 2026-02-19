@@ -137,60 +137,6 @@ class TestEntityCleanupClassifier:
 # =============================================================================
 
 
-class TestValidateExtractedEntities:
-    """Tests for the validate_extracted_entities function."""
-
-    def test_filters_generic_entities(self) -> None:
-        """Test that generic entities are filtered out."""
-        from graphrag_kg_pipeline.extraction.pipeline import validate_extracted_entities
-
-        entities = [
-            {"name": "tool", "label": "Tool"},
-            {"name": "software", "label": "Tool"},
-            {"name": "traceability", "label": "Concept"},
-        ]
-
-        result = validate_extracted_entities(entities)
-
-        assert len(result) == 1
-        assert result[0]["name"] == "traceability"
-
-    def test_normalizes_plurals(self) -> None:
-        """Test that plural entities are normalized to singular."""
-        from graphrag_kg_pipeline.extraction.pipeline import validate_extracted_entities
-
-        entities = [
-            {
-                "name": "requirements",
-                "label": "Concept",
-                "display_name": "Requirements",
-            },
-            {"name": "stakeholders", "label": "Role"},
-        ]
-
-        result = validate_extracted_entities(entities)
-
-        assert len(result) == 2
-        assert result[0]["name"] == "requirement"
-        assert result[0]["display_name"] == "Requirement"
-        assert result[1]["name"] == "stakeholder"
-
-    def test_preserves_valid_entities(self) -> None:
-        """Test that valid entities are preserved unchanged."""
-        from graphrag_kg_pipeline.extraction.pipeline import validate_extracted_entities
-
-        entities = [
-            {"name": "requirements traceability", "label": "Concept"},
-            {"name": "iso 26262", "label": "Standard"},
-            {"name": "jama connect", "label": "Tool"},
-        ]
-
-        result = validate_extracted_entities(entities)
-
-        assert len(result) == 3
-        assert all(e["name"] == entities[i]["name"] for i, e in enumerate(result))
-
-
 # =============================================================================
 # VALIDATION QUERIES TESTS
 # =============================================================================

@@ -549,6 +549,17 @@ async def _run_post_processing(_output_dir: Path) -> None:
         dedup_stats = await normalizer.deduplicate_by_name()
         console.print(f"    Merged {dedup_stats['merged']} duplicates")
 
+        # Entity cleanup (generic terms + plural merging)
+        console.print("  Cleaning up generic and plural entities...")
+        from .postprocessing.entity_cleanup import EntityCleanupNormalizer
+
+        cleanup_normalizer = EntityCleanupNormalizer(driver, config.neo4j_database)
+        cleanup_stats = await cleanup_normalizer.run_cleanup()
+        console.print(
+            f"    Deleted {cleanup_stats['deleted_generic']} generic entities, "
+            f"merged {cleanup_stats['merged_plurals']} plurals"
+        )
+
         # Industry consolidation
         console.print("  Consolidating industries...")
         industry_normalizer = IndustryNormalizer(driver, config.neo4j_database)
