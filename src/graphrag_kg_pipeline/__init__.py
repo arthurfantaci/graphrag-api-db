@@ -134,6 +134,7 @@ from .postprocessing import (
     normalize_entity_name,
     normalize_industry,
 )
+from .preflight import PreflightError
 
 # =============================================================================
 # SCRAPER (always available)
@@ -239,5 +240,6 @@ __all__ = [
     "FetchError",
     "Neo4jConfigError",
     "PlaywrightNotAvailableError",
+    "PreflightError",
     "ScraperError",
 ]

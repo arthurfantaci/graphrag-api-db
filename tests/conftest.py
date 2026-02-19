@@ -413,4 +413,6 @@ def mock_env_vars(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     }
     for key, value in env_vars.items():
         monkeypatch.setenv(key, value)
+    # Set optional keys to empty so load_dotenv() won't refill from .env
+    monkeypatch.setenv("VOYAGE_API_KEY", "")
     return env_vars
