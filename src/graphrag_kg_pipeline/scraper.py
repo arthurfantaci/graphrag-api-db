@@ -594,6 +594,54 @@ async def _run_post_processing(_output_dir: Path) -> None:
             summ_stats = await summarizer.summarize()
             console.print(f"    Summarized {summ_stats['entities_summarized']} entities")
 
+        # LangExtract augmentation (optional — requires langextract[openai])
+        try:
+            from .postprocessing.langextract_augmenter import LangExtractAugmenter
+
+            if config.openai_api_key:
+                console.print("  Running LangExtract augmentation for source grounding...")
+                augmenter = LangExtractAugmenter(
+                    driver=driver,
+                    database=config.neo4j_database,
+                    openai_api_key=config.openai_api_key,
+                    model=config.llm_model,
+                )
+                aug_stats = await augmenter.augment()
+                console.print(
+                    f"    Found {aug_stats['new_entities']} new entities, "
+                    f"grounded {aug_stats['grounded_entities']} existing"
+                )
+        except ImportError:
+            pass  # langextract not installed — skip augmentation
+
+        # Leiden community detection
+        try:
+            from .graph.community_detection import CommunityDetector
+
+            console.print("  Running Leiden community detection...")
+            detector = CommunityDetector(driver=driver, database=config.neo4j_database)
+            comm_stats = await detector.detect_communities()
+            console.print(
+                f"    Found {comm_stats['community_count']} communities "
+                f"(modularity: {comm_stats['modularity']:.4f})"
+            )
+
+            # Community summarization (optional — requires OpenAI)
+            if config.openai_api_key and comm_stats["community_count"] > 0:
+                from .graph.community_summarizer import CommunitySummarizer
+
+                console.print("  Generating community summaries...")
+                summarizer = CommunitySummarizer(
+                    driver=driver,
+                    database=config.neo4j_database,
+                    openai_api_key=config.openai_api_key,
+                )
+                summ_stats = await summarizer.summarize_communities()
+                console.print(f"    Summarized {summ_stats['communities_summarized']} communities")
+
+        except ImportError:
+            pass  # leidenalg/igraph not installed — skip community detection
+
     finally:
         await driver.close()
 

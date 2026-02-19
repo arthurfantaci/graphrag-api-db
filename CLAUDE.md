@@ -103,8 +103,10 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 │  Stage 2: EXTRACT & EMBED (neo4j_graphrag SimpleKGPipeline)             │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
 │  │ JamaHTMLLoader → HierarchicalHTMLSplitter → LLMEntityRelExtractor │  │
+│  │ - Optional Chonkie SemanticChunker (Savitzky-Golay boundaries)    │  │
 │  │ - Schema-constrained entity extraction (10 node types)             │  │
-│  │ - OpenAI embeddings for vector search                              │  │
+│  │ - Voyage AI voyage-4 embeddings (auto-detected from VOYAGE_API_KEY)│  │
+│  │ - Fallback: OpenAI text-embedding-3-small if no Voyage key        │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                              ↓                                           │
 │  Stage 3: NORMALIZE (Entity Post-Processing)                            │
@@ -115,6 +117,9 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 │  │ 4. IndustryNormalizer.consolidate_industries() — 100+ → 18       │  │
 │  │ 5. MentionedInBackfiller.backfill() — MENTIONED_IN + APPLIES_TO  │  │
 │  │ 6. EntitySummarizer.summarize() — LLM entity descriptions        │  │
+│  │ 7. LangExtractAugmenter.augment() — source grounding (optional) │  │
+│  │ 8. CommunityDetector.detect_communities() — Leiden clustering   │  │
+│  │ 9. CommunitySummarizer.summarize_communities() — LLM summaries  │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                              ↓                                           │
 │  Stage 4: SUPPLEMENT (Graph Structure)                                   │
@@ -193,7 +198,9 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 
 9. **loaders/html_loader.py** - `JamaHTMLLoader` implements neo4j_graphrag DataLoader interface.
 
-10. **chunking/hierarchical_chunker.py** - LangChain-based semantic HTML splitting.
+10. **chunking/hierarchical_chunker.py** - LangChain-based hierarchical HTML splitting with optional Chonkie semantic chunking (stage 2 fallback to RCTS).
+
+11. **embeddings/voyage.py** - `VoyageAIEmbeddings` implementing `neo4j_graphrag.embeddings.base.Embedder` for Voyage AI voyage-4 asymmetric embeddings.
 
 **Post-Processing (Stage 3):**
 
@@ -207,20 +214,28 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 
 15. **postprocessing/entity_summarizer.py** - `EntitySummarizer`: LLM-generated entity descriptions.
 
+16. **postprocessing/langextract_augmenter.py** - `LangExtractAugmenter`: post-extraction entity augmentation with source grounding (text span provenance).
+
+**Graph Algorithms (Stage 3, steps 8-9):**
+
+17. **graph/community_detection.py** - `CommunityDetector`: Leiden community detection using `leidenalg` + `igraph` on semantic edges only.
+
+18. **graph/community_summarizer.py** - `CommunitySummarizer`: LLM-generated community summaries (gpt-4o-mini), creates Community nodes linked via IN_COMMUNITY.
+
 **Graph Building (Stage 4):**
 
-16. **graph/supplementary.py** - `SupplementaryGraphBuilder`:
+19. **graph/supplementary.py** - `SupplementaryGraphBuilder`:
     - Chapter structure, Resource nodes, Glossary-to-concept linking
 
-17. **graph/constraints.py** - `ConstraintManager` for Neo4j indexes and constraints.
+20. **graph/constraints.py** - `ConstraintManager` for Neo4j indexes and constraints.
 
 **Validation (Stage 5):**
 
-18. **validation/queries.py** - `ValidationQueries` class with Cypher checks.
+21. **validation/queries.py** - `ValidationQueries` class with Cypher checks.
 
-19. **validation/fixes.py** - `ValidationFixer` for data repair operations.
+22. **validation/fixes.py** - `ValidationFixer` for data repair operations.
 
-20. **validation/reporter.py** - `ValidationReporter` for report generation.
+23. **validation/reporter.py** - `ValidationReporter` for report generation.
 
 ## Key Design Decisions
 
@@ -235,6 +250,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - No built-in graph clear command — use `MATCH (n) DETACH DELETE n` manually
 - Rich progress bars don't flush to redirected output; monitor via Neo4j node count queries
 - Direct OpenAI API calls (gleaning) need `response_format={"type": "json_object"}`
+- Gleaning runs 2 passes by default (each pass queries Neo4j for latest state)
 
 **Scraping Layer:**
 - **Protocol Pattern (PEP 544)** - Structural subtyping for fetcher abstraction enables testing and extensibility
@@ -249,12 +265,15 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - **Schema-Constrained Extraction** - 10 node types and 10 relationship types prevent schema drift
 - **Industry Taxonomy** - 100+ variants normalized to 18 canonical industries
 - **Entity Deduplication** - Plural forms merged (e.g., "requirement" + "requirements" → "requirement")
-- **Hierarchical Chunking** - LangChain HTMLHeaderTextSplitter preserves document structure
+- **Hierarchical Chunking** - LangChain HTMLHeaderTextSplitter preserves document structure; optional Chonkie SemanticChunker for stage 2
+- **Voyage AI Embeddings** - Auto-detected from `VOYAGE_API_KEY` env var; asymmetric `input_type` ("document" for indexing, "query" for search)
+- **Community Detection** - Leiden algorithm via `leidenalg` (reference implementation). Only semantic relationship types projected (not structural). Communities get LLM-generated summaries.
+- **LangExtract Augmentation** - Post-processing entity augmentation with source grounding (text span provenance). Runs after all other cleanup to avoid introducing duplicates.
 - **Supplementary Structure** - Chapter, Resource, and Glossary nodes add navigational context
 
 **Data Quality:**
 - **Validation Framework** - Comprehensive checks for orphans, duplicates, and invalid patterns
 - **Repair Operations** - Safe fixes with dry-run preview mode
-- **Vector Embeddings** - OpenAI text-embedding-3-small for semantic search
+- **Vector Embeddings** - Voyage AI voyage-4 (preferred) or OpenAI text-embedding-3-small for semantic search
 - **Fix ordering** - delete degenerate → re-index → chunk_ids → webinar titles → relabel → backfill MENTIONED_IN → definitions → generic → plurals
 - **Pass/fail checks** - orphan_chunks, duplicates, chunk_ids, chunk_index, plural_duplicates (industry count advisory)

@@ -2,7 +2,7 @@
 
 This module provides a two-stage chunking strategy:
 1. HTMLHeaderTextSplitter: Split by HTML heading elements
-2. RecursiveCharacterTextSplitter: Further split large sections
+2. RecursiveCharacterTextSplitter or Chonkie SemanticChunker: Further split large sections
 
 This approach preserves document structure while ensuring chunks stay
 within size limits for embedding and LLM context windows.
@@ -10,10 +10,14 @@ within size limits for embedding and LLM context windows.
 
 from typing import TYPE_CHECKING
 
+import structlog
+
 from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
+
+logger = structlog.get_logger(__name__)
 
 
 class HierarchicalHTMLSplitter:
@@ -126,18 +130,86 @@ class HierarchicalHTMLSplitter:
                     doc.page_content = " > ".join(prefix_parts) + "\n\n" + doc.page_content
 
         # Stage 2: Further split large sections
+        semantic_splits = 0
+        rcts_fallbacks = 0
         result = []
         for doc in header_splits:
             if len(doc.page_content) > self.config.sliding_window_threshold:
-                # Large section - apply character splitting
+                if self.config.use_semantic_chunking:
+                    sub_docs = self._semantic_split(doc)
+                    if sub_docs:
+                        result.extend(sub_docs)
+                        semantic_splits += 1
+                        continue
+                    rcts_fallbacks += 1
+                # Fallback or default: character splitting
                 sub_chunks = self.char_splitter.split_documents([doc])
                 result.extend(sub_chunks)
             elif len(doc.page_content) >= self.config.min_chunk_size:
-                # Section within limits - keep as is
                 result.append(doc)
             # Skip tiny fragments below min_chunk_size
 
+        if self.config.use_semantic_chunking:
+            logger.info(
+                "Semantic chunking stats",
+                semantic_splits=semantic_splits,
+                rcts_fallbacks=rcts_fallbacks,
+            )
+
         return result
+
+    def _semantic_split(self, doc: "Document") -> list["Document"] | None:
+        """Split a document using Chonkie's SemanticChunker.
+
+        Returns a list of Documents on success, or None to signal
+        fallback to RecursiveCharacterTextSplitter.
+
+        Args:
+            doc: LangChain Document to split semantically.
+
+        Returns:
+            List of sub-documents, or None if fallback is needed.
+        """
+        try:
+            from chonkie import SemanticChunker
+            from langchain_core.documents import Document as LCDocument
+
+            if not hasattr(self, "_semantic_chunker"):
+                self._semantic_chunker = SemanticChunker(
+                    threshold=self.config.semantic_threshold,
+                    chunk_size=self.config.sliding_window_size,
+                )
+
+            chunks = self._semantic_chunker.chunk(doc.page_content)
+
+            if not chunks:
+                logger.info("Semantic chunker returned empty output, falling back to RCTS")
+                return None
+
+            # Reject if any chunk exceeds 2x the threshold size
+            oversized = [
+                c for c in chunks if len(c.text) > 2 * self.config.sliding_window_threshold
+            ]
+            if oversized:
+                logger.info(
+                    "Semantic chunker produced oversized chunks, falling back to RCTS",
+                    oversized_count=len(oversized),
+                )
+                return None
+
+            # Convert Chonkie chunks to LangChain Documents, preserving metadata
+            sub_docs = []
+            for chunk in chunks:
+                if len(chunk.text) >= self.config.min_chunk_size:
+                    sub_docs.append(
+                        LCDocument(page_content=chunk.text, metadata=dict(doc.metadata))
+                    )
+
+            return sub_docs if sub_docs else None
+
+        except Exception:
+            logger.warning("Semantic chunking failed, falling back to RCTS", exc_info=True)
+            return None
 
 
 class MarkdownSplitter:
@@ -228,12 +300,79 @@ class MarkdownSplitter:
                     doc.page_content = " > ".join(prefix_parts) + "\n\n" + doc.page_content
 
         # Stage 2: Further split large sections
+        semantic_splits = 0
+        rcts_fallbacks = 0
         result = []
         for doc in header_splits:
             if len(doc.page_content) > self.config.sliding_window_threshold:
+                if self.config.use_semantic_chunking:
+                    sub_docs = self._semantic_split(doc)
+                    if sub_docs:
+                        result.extend(sub_docs)
+                        semantic_splits += 1
+                        continue
+                    rcts_fallbacks += 1
                 sub_chunks = self.char_splitter.split_documents([doc])
                 result.extend(sub_chunks)
             elif len(doc.page_content) >= self.config.min_chunk_size:
                 result.append(doc)
 
+        if self.config.use_semantic_chunking:
+            logger.info(
+                "Semantic chunking stats",
+                semantic_splits=semantic_splits,
+                rcts_fallbacks=rcts_fallbacks,
+            )
+
         return result
+
+    def _semantic_split(self, doc: "Document") -> list["Document"] | None:
+        """Split a document using Chonkie's SemanticChunker.
+
+        Returns a list of Documents on success, or None to signal
+        fallback to RecursiveCharacterTextSplitter.
+
+        Args:
+            doc: LangChain Document to split semantically.
+
+        Returns:
+            List of sub-documents, or None if fallback is needed.
+        """
+        try:
+            from chonkie import SemanticChunker
+            from langchain_core.documents import Document as LCDocument
+
+            if not hasattr(self, "_semantic_chunker"):
+                self._semantic_chunker = SemanticChunker(
+                    threshold=self.config.semantic_threshold,
+                    chunk_size=self.config.sliding_window_size,
+                )
+
+            chunks = self._semantic_chunker.chunk(doc.page_content)
+
+            if not chunks:
+                logger.info("Semantic chunker returned empty output, falling back to RCTS")
+                return None
+
+            oversized = [
+                c for c in chunks if len(c.text) > 2 * self.config.sliding_window_threshold
+            ]
+            if oversized:
+                logger.info(
+                    "Semantic chunker produced oversized chunks, falling back to RCTS",
+                    oversized_count=len(oversized),
+                )
+                return None
+
+            sub_docs = []
+            for chunk in chunks:
+                if len(chunk.text) >= self.config.min_chunk_size:
+                    sub_docs.append(
+                        LCDocument(page_content=chunk.text, metadata=dict(doc.metadata))
+                    )
+
+            return sub_docs if sub_docs else None
+
+        except Exception:
+            logger.warning("Semantic chunking failed, falling back to RCTS", exc_info=True)
+            return None

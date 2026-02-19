@@ -36,7 +36,16 @@ dependencies = [
     "structlog>=24.0.0",
     # Embeddings (required for Neo4j vector index)
     "openai>=1.0.0",
+    # Voyage AI embeddings (optional — activated by VOYAGE_API_KEY env var)
+    "voyageai>=0.3.7",
     "tiktoken>=0.5.0",
+    # Semantic chunking (Chonkie — Savitzky-Golay boundary detection)
+    "chonkie[semantic]>=0.5.0",
+    # LangExtract entity augmentation + source grounding (Google, OpenAI provider)
+    "langextract[openai]>=1.0.0",
+    # Leiden community detection (reference implementation by algorithm authors)
+    "leidenalg>=0.10.0",
+    "python-igraph>=0.11.0",
     # Neo4j database driver
     "neo4j>=5.0.0",
 ]
@@ -159,7 +168,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Test files don't need docstrings, full type annotations, or top-level imports
 # Magic values are acceptable in test assertions
-"**/test_*.py" = ["D100", "D103", "D104", "ANN", "PLC0415", "PLR2004", "E501", "ARG002", "TC002"]
+"**/test_*.py" = ["D100", "D102", "D103", "D104", "ANN", "PLC0415", "PLR2004", "E501", "ARG002", "TC002"]
 "conftest.py" = ["D100", "D103", "ANN", "PLC0415", "ARG002", "E501"]
 
 # Entry points can be simpler
@@ -171,7 +180,7 @@ ignore = [
 # Scraper's try/return pattern is more readable than try/else
 # save_markdown has readable sequential logic for building markdown output
 # run_scraper has many optional parameters for flexibility
-"**/scraper.py" = ["TRY300", "PLR0912", "PLR0913", "PLC0415"]
+"**/scraper.py" = ["TRY300", "PLR0912", "PLR0913", "PLR0915", "PLC0415"]
 
 # Fetcher uses try/return pattern and lazy imports for optional dependencies
 "**/fetcher.py" = ["TRY300", "PLC0415"]
@@ -194,7 +203,7 @@ ignore = [
 "**/graph/*.py" = ["PLC0415", "PLR0915", "SIM102"]
 "**/validation/*.py" = ["PLC0415", "E501", "PLR2004", "PLR0912", "PLR0915", "RET504"]
 "**/loaders/*.py" = ["PLC0415", "RET504"]
-"**/chunking/*.py" = ["PLC0415"]
+"**/chunking/*.py" = ["PLC0415", "PLR0912", "TRY300"]
 "**/models/resource.py" = ["PLR2004"]  # Magic numbers for validation thresholds
 
 [tool.ruff.lint.pydocstyle]

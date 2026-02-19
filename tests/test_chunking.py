@@ -1,10 +1,13 @@
 """Tests for the chunking module.
 
 This module tests the LangChain-based hierarchical chunking functionality,
-including the HTMLHeaderTextSplitter integration and configuration.
+including the HTMLHeaderTextSplitter integration, Chonkie semantic chunking,
+and configuration.
 """
 
 from __future__ import annotations
+
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -242,3 +245,175 @@ class TestTextSplitterAdapter:
 
         # Adapter should have the expected interface
         assert hasattr(adapter, "text_splitter")
+
+
+class TestSemanticChunkingConfig:
+    """Tests for semantic chunking configuration."""
+
+    def test_semantic_chunking_defaults(self) -> None:
+        """Verify semantic chunking is disabled by default."""
+        config = HierarchicalChunkingConfig()
+
+        assert config.use_semantic_chunking is False
+        assert config.semantic_threshold == 0.5
+
+    def test_semantic_chunking_enabled(self) -> None:
+        """Verify semantic chunking can be enabled via config."""
+        config = HierarchicalChunkingConfig(
+            use_semantic_chunking=True,
+            semantic_threshold=0.7,
+        )
+
+        assert config.use_semantic_chunking is True
+        assert config.semantic_threshold == 0.7
+
+
+class TestSemanticChunking:
+    """Tests for Chonkie SemanticChunker integration."""
+
+    def _make_mock_chunk(self, text: str) -> MagicMock:
+        """Create a mock Chonkie SemanticChunk."""
+        chunk = MagicMock()
+        chunk.text = text
+        chunk.token_count = len(text.split())
+        return chunk
+
+    def test_semantic_split_used_when_enabled(self) -> None:
+        """Verify SemanticChunker is called for large sections when enabled."""
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
+
+        config = HierarchicalChunkingConfig(
+            use_semantic_chunking=True,
+            semantic_threshold=0.5,
+            sliding_window_threshold=500,
+            min_chunk_size=50,
+        )
+        splitter = HierarchicalHTMLSplitter(config)
+
+        # Mock the _semantic_split to return valid docs
+        from langchain_core.documents import Document
+
+        mock_docs = [
+            Document(
+                page_content="First semantic chunk with enough content for testing.", metadata={}
+            ),
+            Document(
+                page_content="Second semantic chunk also with enough content here.", metadata={}
+            ),
+        ]
+        splitter._semantic_split = MagicMock(return_value=mock_docs)
+
+        # Create HTML with a large section that exceeds threshold
+        large_text = "This is test content about requirements management. " * 30
+        html = f"<h1>Title</h1><p>{large_text}</p>"
+
+        docs = splitter.split_text_as_documents(html)
+
+        # Should have called _semantic_split
+        splitter._semantic_split.assert_called()
+        assert len(docs) >= 2
+
+    def test_rcts_fallback_when_semantic_disabled(self) -> None:
+        """Verify RCTS is used when semantic chunking is disabled."""
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
+
+        config = HierarchicalChunkingConfig(
+            use_semantic_chunking=False,
+            sliding_window_threshold=500,
+            sliding_window_size=256,
+            min_chunk_size=50,
+        )
+        splitter = HierarchicalHTMLSplitter(config)
+
+        large_text = "This is test content about requirements management. " * 30
+        html = f"<h1>Title</h1><p>{large_text}</p>"
+
+        docs = splitter.split_text_as_documents(html)
+
+        # Should produce chunks via RCTS (no _semantic_chunker attribute)
+        assert not hasattr(splitter, "_semantic_chunker")
+        assert len(docs) > 0
+
+    def test_rcts_fallback_on_empty_semantic_output(self) -> None:
+        """Verify fallback to RCTS when SemanticChunker returns empty."""
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
+
+        config = HierarchicalChunkingConfig(
+            use_semantic_chunking=True,
+            sliding_window_threshold=500,
+            sliding_window_size=256,
+            min_chunk_size=50,
+        )
+        splitter = HierarchicalHTMLSplitter(config)
+
+        # Mock _semantic_split to return None (trigger fallback)
+        splitter._semantic_split = MagicMock(return_value=None)
+
+        large_text = "This is test content about requirements management. " * 30
+        html = f"<h1>Title</h1><p>{large_text}</p>"
+
+        docs = splitter.split_text_as_documents(html)
+
+        # Should still produce chunks via RCTS fallback
+        assert len(docs) > 0
+
+    def test_metadata_preserved_in_semantic_split(self) -> None:
+        """Verify metadata is preserved through semantic splitting."""
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import (
+            HierarchicalHTMLSplitter,
+        )
+
+        config = HierarchicalChunkingConfig(
+            use_semantic_chunking=True,
+            sliding_window_threshold=500,
+            min_chunk_size=50,
+        )
+        splitter = HierarchicalHTMLSplitter(config)
+
+        # Mock _semantic_split to return docs with metadata
+        from langchain_core.documents import Document
+
+        mock_docs = [
+            Document(
+                page_content="Chunk with enough text for testing purposes.",
+                metadata={"section": "Requirements Traceability"},
+            ),
+        ]
+        splitter._semantic_split = MagicMock(return_value=mock_docs)
+
+        large_text = "Requirements traceability content. " * 30
+        html = f"<h2>Requirements Traceability</h2><p>{large_text}</p>"
+
+        docs = splitter.split_text_as_documents(html)
+
+        # Should contain our mock docs with metadata
+        found = any("section" in doc.metadata for doc in docs)
+        assert found
+
+    def test_markdown_splitter_semantic_support(self) -> None:
+        """Verify MarkdownSplitter also supports semantic chunking."""
+        from graphrag_kg_pipeline.chunking.hierarchical_chunker import MarkdownSplitter
+
+        config = HierarchicalChunkingConfig(
+            use_semantic_chunking=True,
+            sliding_window_threshold=500,
+            min_chunk_size=50,
+        )
+        splitter = MarkdownSplitter(config)
+
+        # Mock _semantic_split to return None (fallback to RCTS)
+        splitter._semantic_split = MagicMock(return_value=None)
+
+        large_text = "This is long markdown content. " * 30
+        markdown = f"# Title\n\n{large_text}"
+
+        docs = splitter.split_text_as_documents(markdown)
+
+        # Should produce chunks via RCTS fallback
+        assert len(docs) > 0
