@@ -464,6 +464,9 @@ async def run_scraper(
         console.print("\n[yellow]Scrape-only mode: Skipping Neo4j pipeline[/]")
         return guide
 
+    # Pre-flight validation
+    await _run_preflight(output_dir)
+
     # Stage 2: Process through neo4j_graphrag pipeline
     pipeline_stats = await _run_neo4j_graphrag_pipeline(guide, output_dir)
 
@@ -485,6 +488,65 @@ async def run_scraper(
         console.print(f"  [red]Failed: {pipeline_stats.get('failed', 0)}[/]")
 
     return guide
+
+
+async def _run_preflight(_output_dir: Path) -> None:
+    """Run pre-flight validation checks before pipeline ingestion.
+
+    Verifies Neo4j connectivity, APOC availability, vector index dimensions,
+    and API key validity. Warns if the database already contains data.
+
+    Args:
+        _output_dir: Directory for output files (reserved for future use).
+
+    Raises:
+        PreflightError: If any critical check fails.
+    """
+    from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
+    from .preflight import PreflightError, run_preflight_checks
+
+    console.print("\n[bold cyan]Running pre-flight checks...[/]")
+
+    config = JamaKGPipelineConfig.from_env()
+    driver = create_async_neo4j_driver(config)
+
+    try:
+        result = await run_preflight_checks(
+            driver=driver,
+            database=config.neo4j_database,
+            expected_dimensions=config.embedding_dimensions,
+            voyage_api_key=config.voyage_api_key,
+        )
+
+        console.print("  Neo4j: [green]connected[/]")
+        console.print(f"  APOC: [green]{result.apoc_version}[/]")
+
+        if result.node_count > 0:
+            console.print(
+                f"  Data: [yellow]{result.node_count:,} existing nodes "
+                f"(clear with MATCH (n) DETACH DELETE n)[/]"
+            )
+        else:
+            console.print("  Data: [green]empty graph[/]")
+
+        if result.vector_index_dimensions is not None:
+            console.print(f"  Vector index: [green]{result.vector_index_dimensions}d[/]")
+        else:
+            console.print("  Vector index: [dim]none (will be created)[/]")
+
+        if result.using_voyage:
+            status = "[green]valid[/]" if result.voyage_api_valid else "[red]invalid[/]"
+            console.print(f"  Voyage AI: {status}")
+        else:
+            console.print("  Embeddings: [dim]OpenAI (no VOYAGE_API_KEY)[/]")
+
+        console.print("[bold green]  ✓ All checks passed[/]")
+
+    except PreflightError as e:
+        console.print(f"\n[red]Pre-flight check failed:[/] {e}")
+        raise
+    finally:
+        await driver.close()
 
 
 async def _run_neo4j_graphrag_pipeline(

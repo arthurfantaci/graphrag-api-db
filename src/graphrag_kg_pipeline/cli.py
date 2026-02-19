@@ -29,6 +29,7 @@ from .exceptions import (
     Neo4jConfigError,
     PlaywrightNotAvailableError,
 )
+from .preflight import PreflightError
 from .scraper import run_scraper
 
 console = Console()
@@ -312,11 +313,13 @@ def _run_scrape_command(args: argparse.Namespace) -> None:
         console.print("[yellow]Dry run mode - no changes will be made[/]")
         console.print()
         console.print("Estimated processing:")
-        console.print("  - ~103 articles")
-        console.print("  - ~15 chapters")
-        console.print("  - ~100 glossary terms")
-        console.print("  - Embedding cost: ~$0.50-1.00 (text-embedding-3-small)")
-        console.print("  - LLM extraction cost: ~$5-10 (gpt-4o)")
+        console.print("  - ~103 articles, ~15 chapters, ~100 glossary terms")
+        console.print("  - Embedding cost: ~$0.10 (Voyage AI) or ~$0.50 (OpenAI)")
+        console.print("  - LLM extraction cost: ~$5-10 (gpt-4o, 2 gleaning passes)")
+        console.print("  - Entity summarization: ~$1-2 (gpt-4o)")
+        console.print("  - Community summaries: ~$0.10 (gpt-4o-mini)")
+        console.print("  - Estimated total: ~$7-13")
+        console.print("  - Estimated time: ~1.5 hours")
         return
 
     try:
@@ -341,6 +344,9 @@ def _run_scrape_command(args: argparse.Namespace) -> None:
     except Neo4jConfigError:
         console.print("\n[red]Error: Neo4j configuration missing[/]")
         console.print("Set: [cyan]NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD[/]")
+        raise SystemExit(1) from None
+    except PreflightError:
+        # Error details already printed by _run_preflight()
         raise SystemExit(1) from None
     except KeyboardInterrupt:
         console.print("\n[yellow]Pipeline interrupted by user[/]")
