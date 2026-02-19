@@ -111,6 +111,15 @@ class ValidationReport:
             )
             lines.append("")
 
+        # Missing chunk indices
+        if self.details.get("missing_chunk_index", 0) > 0:
+            lines.append("### ⚠️ Missing Chunk Index")
+            lines.append("")
+            lines.append(
+                f"Found **{self.details['missing_chunk_index']}** chunks without index property."
+            )
+            lines.append("")
+
         # Missing chunk_ids
         if self.details.get("missing_chunk_ids", 0) > 0:
             lines.append("### ⚠️ Missing Chunk IDs")
@@ -120,6 +129,23 @@ class ValidationReport:
             )
             lines.append("")
             lines.append("Run `graphrag-kg validate --fix` to generate chunk_ids.")
+            lines.append("")
+
+        # Degenerate chunks
+        if self.details.get("degenerate_chunks"):
+            lines.append("### ⚠️ Degenerate Chunks")
+            lines.append("")
+            lines.append(
+                f"Found **{len(self.details['degenerate_chunks'])}** chunks "
+                "with very short text and no entity relationships:"
+            )
+            lines.append("")
+            for chunk in self.details["degenerate_chunks"][:5]:
+                text_preview = (chunk.get("text") or "")[:60]
+                lines.append(f"  - ({chunk.get('text_length', 0)} chars) `{text_preview}...`")
+            if len(self.details["degenerate_chunks"]) > 5:
+                remaining = len(self.details["degenerate_chunks"]) - 5
+                lines.append(f"  - ... and {remaining} more")
             lines.append("")
 
         # Plural/singular duplicates
@@ -163,6 +189,87 @@ class ValidationReport:
                 lines.append(f"| ... | {remaining} more | ... |")
             lines.append("")
             lines.append("Run `graphrag-kg validate --fix` to remove generic entities.")
+            lines.append("")
+
+        # Potentially mislabeled entities
+        if self.details.get("potentially_mislabeled"):
+            lines.append("### ⚠️ Potentially Mislabeled Challenges")
+            lines.append("")
+            lines.append(
+                "Found Challenge nodes with positive-outcome names "
+                "(may be goals/outcomes, not challenges):"
+            )
+            lines.append("")
+            for entity in self.details["potentially_mislabeled"][:10]:
+                lines.append(f"  - {entity['name']}")
+            if len(self.details["potentially_mislabeled"]) > 10:
+                remaining = len(self.details["potentially_mislabeled"]) - 10
+                lines.append(f"  - ... and {remaining} more")
+            lines.append("")
+
+        # Entities without MENTIONED_IN
+        if self.details.get("entities_without_mentioned_in"):
+            count = len(self.details["entities_without_mentioned_in"])
+            lines.append("### ⚠️ Entities Without MENTIONED_IN")
+            lines.append("")
+            lines.append(f"Found **{count}** entities not linked to any chunk via MENTIONED_IN:")
+            lines.append("")
+            # Group by label for compact display
+            by_label: dict[str, int] = {}
+            for entity in self.details["entities_without_mentioned_in"]:
+                lbl = entity.get("label", "Unknown")
+                by_label[lbl] = by_label.get(lbl, 0) + 1
+            for lbl, cnt in sorted(by_label.items(), key=lambda x: -x[1]):
+                lines.append(f"  - {lbl}: {cnt}")
+            lines.append("")
+
+        # Ghost entities (MENTIONED_IN only, no semantic rels)
+        if self.details.get("entities_without_semantic_rels"):
+            count = len(self.details["entities_without_semantic_rels"])
+            lines.append("### ⚠️ Ghost Entities (No Semantic Relationships)")
+            lines.append("")
+            lines.append(
+                f"Found **{count}** entities with MENTIONED_IN but no "
+                "outbound semantic relationships:"
+            )
+            lines.append("")
+            for entity in self.details["entities_without_semantic_rels"][:10]:
+                lines.append(f"  - {entity.get('label', '?')}: {entity['name']}")
+            if count > 10:
+                lines.append(f"  - ... and {count - 10} more")
+            lines.append("")
+
+        # Near-duplicate entities
+        if self.details.get("near_duplicates"):
+            lines.append("### ⚠️ Near-Duplicate Entities")
+            lines.append("")
+            lines.append("| Label | Shorter | Longer |")
+            lines.append("|-------|---------|--------|")
+            for pair in self.details["near_duplicates"][:15]:
+                lines.append(
+                    f"| {pair['label']} | {pair['shorter_name']} | {pair['longer_name']} |"
+                )
+            if len(self.details["near_duplicates"]) > 15:
+                remaining = len(self.details["near_duplicates"]) - 15
+                lines.append(f"| ... | {remaining} more pairs | ... |")
+            lines.append("")
+
+        # Missing definitions
+        if self.details.get("missing_definitions"):
+            lines.append("### ⚠️ Missing Definitions")
+            lines.append("")
+            lines.append("| Label | Count |")
+            lines.append("|-------|-------|")
+            for item in self.details["missing_definitions"]:
+                lines.append(f"| {item['label']} | {item['count']} |")
+            lines.append("")
+
+        # Truncated webinar titles
+        if self.details.get("truncated_webinar_titles"):
+            count = len(self.details["truncated_webinar_titles"])
+            lines.append("### ⚠️ Truncated Webinar Titles")
+            lines.append("")
+            lines.append(f"Found **{count}** webinars with truncated or missing titles.")
             lines.append("")
 
         # Industry count
@@ -253,10 +360,20 @@ class ValidationReporter:
                 "entity_stats": results["entity_stats"],
                 "invalid_patterns": results["invalid_patterns"],
                 "article_coverage": results["article_coverage"],
-                # New details
+                # Chunk quality
                 "missing_chunk_ids": results.get("missing_chunk_ids", 0),
+                "missing_chunk_index": results.get("missing_chunk_index", 0),
+                "degenerate_chunks": results.get("degenerate_chunks", []),
+                # Entity quality
                 "plural_singular_duplicates": results.get("plural_singular_duplicates", []),
                 "generic_entities": results.get("generic_entities", []),
+                "entities_without_mentioned_in": results.get("entities_without_mentioned_in", []),
+                "entities_without_semantic_rels": results.get("entities_without_semantic_rels", []),
+                "potentially_mislabeled": results.get("potentially_mislabeled", []),
+                "near_duplicates": results.get("near_duplicates", []),
+                "missing_definitions": results.get("missing_definitions", []),
+                # Webinar quality
+                "truncated_webinar_titles": results.get("truncated_webinar_titles", []),
             },
             recommendations=self._generate_recommendations(results),
         )
@@ -299,12 +416,24 @@ class ValidationReporter:
                 "Review and fix invalid relationship patterns (may indicate extraction issues)"
             )
 
-        # New recommendations for chunk_id and entity cleanup
+        # Chunk quality recommendations
+        if results.get("missing_chunk_index", 0) > 0:
+            recommendations.append(
+                f"Run `graphrag-kg validate --fix` to assign {results['missing_chunk_index']} missing chunk indices"
+            )
+
         if results.get("missing_chunk_ids", 0) > 0:
             recommendations.append(
                 f"Run `graphrag-kg validate --fix` to generate {results['missing_chunk_ids']} missing chunk_ids"
             )
 
+        degenerate_count = len(results.get("degenerate_chunks", []))
+        if degenerate_count > 0:
+            recommendations.append(
+                f"Run `graphrag-kg validate --fix` to remove {degenerate_count} degenerate chunks"
+            )
+
+        # Entity quality recommendations
         plural_count = len(results.get("plural_singular_duplicates", []))
         if plural_count > 0:
             recommendations.append(
@@ -315,6 +444,45 @@ class ValidationReporter:
         if generic_count > 0:
             recommendations.append(
                 f"Run `graphrag-kg validate --fix` to remove {generic_count} overly generic entities"
+            )
+
+        mislabeled_count = len(results.get("potentially_mislabeled", []))
+        if mislabeled_count > 0:
+            recommendations.append(
+                f"Run `graphrag-kg validate --fix` to relabel {mislabeled_count} potentially mislabeled Challenge entities"
+            )
+
+        no_mentioned_in = len(results.get("entities_without_mentioned_in", []))
+        if no_mentioned_in > 0:
+            recommendations.append(
+                f"Run `graphrag-kg validate --fix` to backfill MENTIONED_IN for {no_mentioned_in} disconnected entities"
+            )
+
+        missing_def_total = sum(
+            item.get("count", 0) for item in results.get("missing_definitions", [])
+        )
+        if missing_def_total > 0:
+            recommendations.append(
+                f"Run `graphrag-kg validate --fix` to backfill {missing_def_total} missing definitions from glossary"
+            )
+
+        webinar_count = len(results.get("truncated_webinar_titles", []))
+        if webinar_count > 0:
+            recommendations.append(
+                f"Run `graphrag-kg validate --fix` to fix {webinar_count} truncated webinar titles"
+            )
+
+        # Advisory-only (no fix available)
+        ghost_count = len(results.get("entities_without_semantic_rels", []))
+        if ghost_count > 0:
+            recommendations.append(
+                f"Review {ghost_count} ghost entities with no semantic relationships (advisory)"
+            )
+
+        near_dup_count = len(results.get("near_duplicates", []))
+        if near_dup_count > 0:
+            recommendations.append(
+                f"Review {near_dup_count} near-duplicate entity pairs for manual merge (advisory)"
             )
 
         if not recommendations:

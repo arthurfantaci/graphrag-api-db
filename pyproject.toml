@@ -28,7 +28,7 @@ dependencies = [
     "rich>=13.7.0",
     "tenacity>=8.2.0",
     # Neo4j GraphRAG pipeline (replaces langextract)
-    "neo4j-graphrag>=1.0.0",
+    "neo4j-graphrag>=1.13.0",
     "langchain-text-splitters>=0.3.0",
     # Entity matching and normalization
     "rapidfuzz>=3.0.0",
@@ -189,6 +189,7 @@ ignore = [
 "**/extraction/pipeline.py" = ["PLC0415", "PLR0913", "TRY300", "TRY400"]
 "**/extraction/schema.py" = ["E501"]  # Long description strings
 "**/extraction/prompts.py" = ["E501", "PLC0415"]  # Long prompt strings
+"**/extraction/gleaning.py" = ["PLC0415"]  # Lazy import for openai
 "**/postprocessing/*.py" = ["PLC0415", "E501", "RET504", "PLR0911", "PLR0912", "PLR0915", "PLR2004", "TRY400"]  # Cypher queries, complex taxonomy logic
 "**/graph/*.py" = ["PLC0415", "PLR0915", "SIM102"]
 "**/validation/*.py" = ["PLC0415", "E501", "PLR2004", "PLR0912", "PLR0915", "RET504"]

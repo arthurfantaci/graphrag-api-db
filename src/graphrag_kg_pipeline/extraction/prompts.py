@@ -187,14 +187,31 @@ CORRECT extraction:
 
 Use DEFINES when a standard defines or specifies a concept.
 
+### 5. Challenge Classification (IMPORTANT!)
+- **Challenge** = ONLY obstacles, difficulties, problems, risks that need to be overcome
+  - ✓ scope creep, requirements volatility, incomplete traceability, late defect discovery
+- **NEVER classify these as Challenge:**
+  - ✗ Positive outcomes, goals, product qualities, or desirable states
+  - ✗ "High-Quality Products" → NOT a Challenge (it's a goal/outcome)
+  - ✗ "Customer Satisfaction" → NOT a Challenge (it's a goal)
+  - ✗ "Reduced Time-to-Market" → NOT a Challenge (it's a benefit)
+
+### 6. Definition Extraction (CRITICAL!)
+- ALWAYS include definitions: When the text contains a definition, explanation,
+  or description of a concept, you MUST include it as the `definition` property.
+  This is critical for knowledge graph completeness.
+- Even partial definitions are valuable — capture them.
+- If a term is defined with "is", "refers to", "means", or "involves", extract the definition.
+
 ## ADDITIONAL GUIDELINES:
 
 1. **Be specific**: "bidirectional traceability" is more valuable than just "traceability"
 2. **Avoid duplicates**: Don't create separate entities for singular/plural forms
 3. **Capture relationships**: The graph structure is as valuable as the entities
 4. **Use patterns**: Only create relationships matching the defined PATTERNS
-5. **Include context**: Add definition/description properties when text provides them
-6. **Check relationship direction**: Always verify source→target matches allowed patterns
+5. **Check relationship direction**: Always verify source→target matches allowed patterns
+6. **Extract all standards and industries**: Even when mentioned in passing, extract Standard
+   and Industry entities. The MENTIONED_IN relationship to their source chunk is valuable.
 
 ## NORMALIZATION RULES (CRITICAL):
 
@@ -283,10 +300,14 @@ Input text:
 def get_few_shot_examples() -> list[dict]:
     """Get few-shot examples for entity extraction.
 
+    Returns a pool of curated examples covering all 10 entity types,
+    common error cases, and correct definition extraction.
+
     Returns:
         List of example dictionaries with 'text', 'entities', and 'relationships'.
     """
     return [
+        # Example 1: Concept + Standard + Industry (with definition)
         {
             "text": (
                 "Requirements traceability is critical for regulatory compliance "
@@ -325,6 +346,7 @@ def get_few_shot_examples() -> list[dict]:
                 },
             ],
         },
+        # Example 2: Methodology + Standard + Industry
         {
             "text": (
                 "Agile methodologies like Scrum can be challenging to reconcile "
@@ -368,6 +390,173 @@ def get_few_shot_examples() -> list[dict]:
                 {"source": "scrum", "type": "COMPONENT_OF", "target": "agile"},
                 {"source": "do-178c", "type": "APPLIES_TO", "target": "aerospace"},
                 {"source": "v-model", "type": "APPLIES_TO", "target": "aerospace"},
+            ],
+        },
+        # Example 3: Challenge + Bestpractice + definition extraction
+        {
+            "text": (
+                "Scope creep refers to the uncontrolled expansion of project scope "
+                "without adjustments to time, cost, or resources. A best practice to "
+                "address scope creep is implementing a formal change control process."
+            ),
+            "entities": [
+                {
+                    "type": "Challenge",
+                    "name": "scope creep",
+                    "display_name": "Scope Creep",
+                    "definition": (
+                        "the uncontrolled expansion of project scope "
+                        "without adjustments to time, cost, or resources"
+                    ),
+                    "severity": "high",
+                },
+                {
+                    "type": "Bestpractice",
+                    "name": "formal change control process",
+                    "display_name": "Formal Change Control Process",
+                    "rationale": "addresses scope creep by controlling changes",
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "formal change control process",
+                    "type": "ADDRESSES",
+                    "target": "scope creep",
+                },
+            ],
+        },
+        # Example 4: Tool + Role + Artifact
+        {
+            "text": (
+                "Jama Connect enables requirements engineers to create and maintain "
+                "a requirements traceability matrix (RTM) throughout the lifecycle."
+            ),
+            "entities": [
+                {
+                    "type": "Tool",
+                    "name": "jama connect",
+                    "display_name": "Jama Connect",
+                    "vendor": "Jama Software",
+                    "category": "requirements management",
+                },
+                {
+                    "type": "Role",
+                    "name": "requirements engineer",
+                    "display_name": "Requirements Engineer",
+                },
+                {
+                    "type": "Artifact",
+                    "name": "requirements traceability matrix",
+                    "display_name": "Requirements Traceability Matrix",
+                    "abbreviation": "RTM",
+                    "artifact_type": "matrix",
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "requirements engineer",
+                    "type": "USED_BY",
+                    "target": "jama connect",
+                },
+                {
+                    "source": "requirements engineer",
+                    "type": "PRODUCES",
+                    "target": "requirements traceability matrix",
+                },
+            ],
+        },
+        # Example 5: Positive outcome is NOT a Challenge (borderline case)
+        {
+            "text": (
+                "Achieving high-quality products requires establishing strong "
+                "requirements management practices early in the development lifecycle."
+            ),
+            "entities": [
+                {
+                    "type": "Concept",
+                    "name": "requirements management",
+                    "display_name": "Requirements Management",
+                    "definition": (
+                        "practices for managing requirements throughout the development lifecycle"
+                    ),
+                },
+            ],
+            "relationships": [],
+            "_note": (
+                "high-quality products is a GOAL, not a Challenge. "
+                "Do not create Challenge entities for positive outcomes."
+            ),
+        },
+        # Example 6: ProcessStage + PREREQUISITE_FOR
+        {
+            "text": (
+                "Requirements validation must be completed before the design "
+                "phase begins. During validation, business analysts verify that "
+                "requirements accurately reflect stakeholder needs."
+            ),
+            "entities": [
+                {
+                    "type": "Processstage",
+                    "name": "requirements validation",
+                    "display_name": "Requirements Validation",
+                    "definition": (
+                        "verifying that requirements accurately reflect stakeholder needs"
+                    ),
+                },
+                {
+                    "type": "Processstage",
+                    "name": "design phase",
+                    "display_name": "Design Phase",
+                },
+                {
+                    "type": "Role",
+                    "name": "business analyst",
+                    "display_name": "Business Analyst",
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "requirements validation",
+                    "type": "PREREQUISITE_FOR",
+                    "target": "design phase",
+                },
+            ],
+        },
+        # Example 7: Standard DEFINES concept (not APPLIES_TO)
+        {
+            "text": (
+                "ISO 26262 defines functional safety levels (ASIL A through D) "
+                "for automotive electronic systems."
+            ),
+            "entities": [
+                {
+                    "type": "Standard",
+                    "name": "iso 26262",
+                    "display_name": "ISO 26262",
+                    "organization": "ISO",
+                    "domain": "automotive",
+                },
+                {
+                    "type": "Concept",
+                    "name": "functional safety level",
+                    "display_name": "Functional Safety Level",
+                    "definition": "safety integrity levels from ASIL A through D",
+                    "aliases": ["ASIL"],
+                },
+                {
+                    "type": "Industry",
+                    "name": "automotive",
+                    "display_name": "Automotive",
+                    "regulated": True,
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "iso 26262",
+                    "type": "DEFINES",
+                    "target": "functional safety level",
+                },
+                {"source": "iso 26262", "type": "APPLIES_TO", "target": "automotive"},
             ],
         },
     ]

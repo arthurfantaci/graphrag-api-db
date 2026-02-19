@@ -83,14 +83,20 @@ class HierarchicalHTMLSplitter:
         docs = self.split_text_as_documents(html_content)
         return [doc.page_content for doc in docs]
 
-    def split_text_as_documents(self, html_content: str) -> list["Document"]:
+    def split_text_as_documents(
+        self,
+        html_content: str,
+        article_metadata: dict[str, str] | None = None,
+    ) -> list["Document"]:
         """Split HTML content into hierarchical chunks with metadata.
 
-        First splits by HTML headers, then applies character splitting
-        to any sections exceeding the threshold.
+        First splits by HTML headers, then prepends section heading context
+        to each chunk, then applies character splitting to large sections.
 
         Args:
             html_content: HTML string to split.
+            article_metadata: Optional article context (article_title, etc.)
+                to prepend to chunks for improved extraction and retrieval.
 
         Returns:
             List of Document objects with metadata from headers.
@@ -103,6 +109,21 @@ class HierarchicalHTMLSplitter:
 
         if not header_splits:
             return []
+
+        # Stage 1.5: Prepend header metadata to chunk text for context
+        # This helps both extraction (LLM sees section context) and
+        # retrieval (embeddings capture hierarchical position)
+        if article_metadata:
+            for doc in header_splits:
+                prefix_parts = []
+                article_title = article_metadata.get("article_title")
+                if article_title:
+                    prefix_parts.append(f"Article: {article_title}")
+                for key in ["article_title", "section", "subsection"]:
+                    if key in doc.metadata:
+                        prefix_parts.append(doc.metadata[key])
+                if prefix_parts:
+                    doc.page_content = " > ".join(prefix_parts) + "\n\n" + doc.page_content
 
         # Stage 2: Further split large sections
         result = []
@@ -200,11 +221,16 @@ class MarkdownSplitter:
         docs = self.split_text_as_documents(markdown_content)
         return [doc.page_content for doc in docs]
 
-    def split_text_as_documents(self, markdown_content: str) -> list["Document"]:
+    def split_text_as_documents(
+        self,
+        markdown_content: str,
+        article_metadata: dict[str, str] | None = None,
+    ) -> list["Document"]:
         """Split markdown content into hierarchical chunks with metadata.
 
         Args:
             markdown_content: Markdown string to split.
+            article_metadata: Optional article context to prepend to chunks.
 
         Returns:
             List of Document objects with header metadata.
@@ -217,6 +243,19 @@ class MarkdownSplitter:
 
         if not header_splits:
             return []
+
+        # Stage 1.5: Prepend header metadata to chunk text for context
+        if article_metadata:
+            for doc in header_splits:
+                prefix_parts = []
+                article_title = article_metadata.get("article_title")
+                if article_title:
+                    prefix_parts.append(f"Article: {article_title}")
+                for key in ["h1", "h2", "h3"]:
+                    if key in doc.metadata:
+                        prefix_parts.append(doc.metadata[key])
+                if prefix_parts:
+                    doc.page_content = " > ".join(prefix_parts) + "\n\n" + doc.page_content
 
         # Stage 2: Further split large sections
         result = []

@@ -19,18 +19,14 @@ logger = structlog.get_logger(__name__)
 # =============================================================================
 
 # Uniqueness constraints for node types
+#
+# NOTE: Entity type constraints (Concept, Challenge, etc.) are intentionally
+# omitted. neo4j_graphrag 1.13+ uses CREATE with __KGBuilder__ label followed
+# by apoc.create.addLabels() to add type labels. Per-type uniqueness constraints
+# cause IndexEntryConflictException when the same entity name appears across
+# multiple extraction batches, rolling back entire batch transactions.
+# Entity deduplication is handled by neo4j_graphrag's entity resolution step.
 UNIQUENESS_CONSTRAINTS = [
-    # Core entity types
-    ("Concept", "name"),
-    ("Challenge", "name"),
-    ("Artifact", "name"),
-    ("Bestpractice", "name"),
-    ("Processstage", "name"),
-    ("Role", "name"),
-    ("Standard", "name"),
-    ("Tool", "name"),
-    ("Methodology", "name"),
-    ("Industry", "name"),
     # Lexical graph nodes
     ("Article", "article_id"),
     ("Chunk", "chunk_id"),
@@ -262,6 +258,32 @@ async def create_all_constraints(
     """
     manager = ConstraintManager(driver, database)
     return await manager.create_all()
+
+
+async def create_fulltext_index(
+    driver: "Driver",
+    database: str = "neo4j",
+    index_name: str = "chunk_text_fulltext",
+) -> None:
+    """Create full-text index for BM25 hybrid search on Chunk text.
+
+    Enables keyword-based retrieval alongside vector search for exact terms
+    like standard names ("ISO 26262"), acronyms ("RTM"), and technical terms.
+
+    Args:
+        driver: Neo4j driver.
+        database: Database name.
+        index_name: Name for the full-text index.
+    """
+    query = f"""
+    CREATE FULLTEXT INDEX {index_name} IF NOT EXISTS
+    FOR (c:Chunk) ON EACH [c.text]
+    """
+
+    async with driver.session(database=database) as session:
+        await session.run(query)
+
+    logger.info("Created full-text index", index_name=index_name)
 
 
 async def create_vector_index(

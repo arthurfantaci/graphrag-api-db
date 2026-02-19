@@ -242,7 +242,7 @@ requires-dist = [
     { name = "langchain-text-splitters", specifier = ">=0.3.0" },
     { name = "lxml", specifier = ">=5.0.0" },
     { name = "neo4j", specifier = ">=5.0.0" },
-    { name = "neo4j-graphrag", specifier = ">=1.0.0" },
+    { name = "neo4j-graphrag", specifier = ">=1.13.0" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.5.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
