@@ -63,6 +63,10 @@ class JamaKGPipelineConfig:
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
 
+    # Voyage AI configuration (optional — auto-detected from VOYAGE_API_KEY)
+    voyage_api_key: str = ""
+    voyage_model: str = "voyage-4"
+
     # Chunking configuration
     chunking_config: HierarchicalChunkingConfig = field(default_factory=HierarchicalChunkingConfig)
 
@@ -72,7 +76,7 @@ class JamaKGPipelineConfig:
 
     # Quality enhancement settings
     enable_gleaning: bool = True
-    gleaning_passes: int = 1
+    gleaning_passes: int = 2
 
     # Graph labels
     document_node_label: str = "Article"
@@ -105,6 +109,7 @@ class JamaKGPipelineConfig:
         neo4j_password = os.getenv("NEO4J_PASSWORD", "")
         neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
         openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        voyage_api_key = os.getenv("VOYAGE_API_KEY", "")
 
         if not openai_api_key:
             msg = "OPENAI_API_KEY environment variable is required"
@@ -116,6 +121,7 @@ class JamaKGPipelineConfig:
             neo4j_password=neo4j_password,
             neo4j_database=neo4j_database,
             openai_api_key=openai_api_key,
+            voyage_api_key=voyage_api_key,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -217,11 +223,26 @@ def create_jama_kg_pipeline(
         },
     )
 
-    # Create embeddings
-    embedder = OpenAIEmbeddings(
-        model=config.embedding_model,
-        api_key=config.openai_api_key,
-    )
+    # Create embeddings (auto-detect Voyage AI if VOYAGE_API_KEY is set)
+    if config.voyage_api_key:
+        from graphrag_kg_pipeline.embeddings.voyage import VoyageAIEmbeddings
+
+        embedder = VoyageAIEmbeddings(
+            model=config.voyage_model,
+            input_type="document",
+            dimensions=config.embedding_dimensions,
+        )
+        logger.info(
+            "Using Voyage AI embeddings",
+            model=config.voyage_model,
+            dimensions=config.embedding_dimensions,
+        )
+    else:
+        embedder = OpenAIEmbeddings(
+            model=config.embedding_model,
+            api_key=config.openai_api_key,
+        )
+        logger.info("Using OpenAI embeddings", model=config.embedding_model)
 
     # Create text splitter adapter
     text_splitter = create_text_splitter_adapter(

@@ -385,7 +385,7 @@ class TestPipelineConfigGleaningSettings:
 
         config = JamaKGPipelineConfig()
         assert config.enable_gleaning is True
-        assert config.gleaning_passes == 1
+        assert config.gleaning_passes == 2
 
 
 class TestGlossaryPipelineProcessing:

@@ -44,6 +44,11 @@ class HierarchicalChunkingConfig:
     # Filtering configuration — 100 prevents degenerate heading-only chunks
     min_chunk_size: int = 100
 
+    # Semantic chunking configuration (Chonkie SemanticChunker)
+    # threshold is cosine similarity 0-1; lower = larger chunks, higher = finer splits
+    use_semantic_chunking: bool = False
+    semantic_threshold: float = 0.5
+
     # RecursiveCharacterTextSplitter configuration
     separators: tuple[str, ...] = field(
         default_factory=lambda: (
