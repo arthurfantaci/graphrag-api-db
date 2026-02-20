@@ -6,9 +6,15 @@ functionality that ensures data quality after extraction.
 
 from __future__ import annotations
 
+import re
+from typing import TYPE_CHECKING
+
 import pytest
 
 from tests.conftest import MockDriver, MockSession
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # =============================================================================
 # ENTITY CLEANUP TESTS
@@ -1210,3 +1216,62 @@ class TestPhase4Reporter:
         assert "webinar titles" in rec_text
         assert "ghost entities" in rec_text
         assert "near-duplicate" in rec_text
+
+
+# =============================================================================
+# REPORT SAVE / ARCHIVE TESTS
+# =============================================================================
+
+
+class TestValidationReportSave:
+    """Tests for ValidationReport.save() auto-archiving."""
+
+    def test_save_archives_existing_report(self, tmp_path: Path) -> None:
+        """Verify that saving when a file exists renames the old one with a timestamp."""
+        from graphrag_kg_pipeline.validation.reporter import ValidationReport
+
+        filepath = tmp_path / "validation_report.md"
+        filepath.write_text("old content")
+
+        report = ValidationReport(validation_passed=True, summary={}, details={})
+        report.save(filepath)
+
+        # New report written at canonical path
+        assert filepath.exists()
+        assert "Knowledge Graph Validation Report" in filepath.read_text()
+
+        # Exactly one archived file alongside the canonical one
+        archived = [p for p in tmp_path.iterdir() if p != filepath]
+        assert len(archived) == 1
+        assert archived[0].read_text() == "old content"
+
+    def test_save_no_archive_when_no_existing(self, tmp_path: Path) -> None:
+        """Verify no archive file is created on first save."""
+        from graphrag_kg_pipeline.validation.reporter import ValidationReport
+
+        filepath = tmp_path / "validation_report.md"
+
+        report = ValidationReport(validation_passed=True, summary={}, details={})
+        report.save(filepath)
+
+        # Only the canonical file should exist
+        all_files = list(tmp_path.iterdir())
+        assert len(all_files) == 1
+        assert all_files[0] == filepath
+
+    def test_save_archive_filename_format(self, tmp_path: Path) -> None:
+        """Verify the archived filename matches the expected ISO 8601 pattern."""
+        from graphrag_kg_pipeline.validation.reporter import ValidationReport
+
+        filepath = tmp_path / "validation_report.md"
+        filepath.write_text("previous run")
+
+        report = ValidationReport(validation_passed=True, summary={}, details={})
+        report.save(filepath)
+
+        archived = [p for p in tmp_path.iterdir() if p != filepath]
+        assert len(archived) == 1
+
+        # Pattern: validation_report_YYYY-MM-DDTHHMMSS.md
+        pattern = r"^validation_report_\d{4}-\d{2}-\d{2}T\d{6}\.md$"
+        assert re.match(pattern, archived[0].name), f"Unexpected name: {archived[0].name}"

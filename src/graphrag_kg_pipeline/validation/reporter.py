@@ -308,11 +308,34 @@ class ValidationReport:
     def save(self, filepath: Path) -> None:
         """Save report to file.
 
+        Archives any existing report with an ISO 8601 timestamp before
+        writing the new one, so the latest report is always at the
+        canonical path and previous versions are preserved.
+
         Args:
             filepath: Path to save the report.
         """
+        if filepath.exists():
+            self._archive_existing(filepath)
         filepath.write_text(self.to_markdown())
         logger.info("Saved validation report", path=str(filepath))
+
+    @staticmethod
+    def _archive_existing(filepath: Path) -> Path:
+        """Rename an existing report with its modification timestamp.
+
+        Args:
+            filepath: Path to the existing report file.
+
+        Returns:
+            Path to the archived file.
+        """
+        mtime = filepath.stat().st_mtime
+        ts = datetime.fromtimestamp(mtime, tz=UTC).strftime("%Y-%m-%dT%H%M%S")
+        archived = filepath.with_name(f"{filepath.stem}_{ts}{filepath.suffix}")
+        filepath.rename(archived)
+        logger.info("Archived previous report", path=str(archived))
+        return archived
 
 
 class ValidationReporter:
