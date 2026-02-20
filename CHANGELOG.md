@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.1.0] - 2026-01-20
+## [0.1.0] - 2026-02-20
 
 ### Added
 
@@ -23,6 +23,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - CLI with `scrape` and `validate` subcommands, dry-run support, and cost estimation
 - Pre-flight validation before pipeline ingestion
 - CI/CD pipeline with linting (Ruff), type checking (ty), unit tests, and integration tests
+- PEP 561 `py.typed` marker for downstream type checking support
+- Example scripts in `examples/` directory (knowledge graph querying)
+- Contributing guide, Dependabot configuration, and README badges
+
+### Changed
+
+- Consolidated `models_core.py` into `models/content.py` subpackage for structural consistency
+- Unified `LLM_EXTRACTED_ENTITY_LABELS` as single-source `frozenset` in `extraction/schema.py`
+- Curated public API exports in `postprocessing` and `validation` packages
 
 ### Fixed
 
