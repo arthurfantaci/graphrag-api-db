@@ -53,6 +53,8 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/arthurfantaci/graphrag-api-db"
 Repository = "https://github.com/arthurfantaci/graphrag-api-db"
+"Bug Tracker" = "https://github.com/arthurfantaci/graphrag-api-db/issues"
+Changelog = "https://github.com/arthurfantaci/graphrag-api-db/blob/main/CHANGELOG.md"
 
 [project.scripts]
 graphrag-kg = "graphrag_kg_pipeline.cli:main"
