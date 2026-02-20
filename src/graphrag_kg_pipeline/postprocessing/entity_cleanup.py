@@ -23,6 +23,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from graphrag_kg_pipeline.extraction.schema import LLM_EXTRACTED_ENTITY_LABELS
+
 if TYPE_CHECKING:
     from neo4j import AsyncDriver, Driver
 
@@ -30,25 +32,6 @@ if TYPE_CHECKING:
     AnyDriver = Driver | AsyncDriver
 
 logger = structlog.get_logger(__name__)
-
-
-# =============================================================================
-# LLM-EXTRACTED ENTITY LABELS
-# =============================================================================
-# These are the only labels subject to cleanup operations
-
-LLM_EXTRACTED_ENTITY_LABELS: set[str] = {
-    "Concept",
-    "Challenge",
-    "Artifact",
-    "Bestpractice",
-    "Processstage",
-    "Role",
-    "Standard",
-    "Tool",
-    "Methodology",
-    "Industry",
-}
 
 
 # =============================================================================

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from graphrag_kg_pipeline.extraction.schema import LLM_EXTRACTED_ENTITY_LABELS
+
 if TYPE_CHECKING:
     from neo4j import AsyncDriver, Driver
 
@@ -15,21 +17,6 @@ if TYPE_CHECKING:
     AnyDriver = Driver | AsyncDriver
 
 logger = structlog.get_logger(__name__)
-
-# Entity labels that are LLM-extracted and subject to cleanup
-# These are distinct from structural nodes (Article, Chunk, Definition, etc.)
-LLM_EXTRACTED_ENTITY_LABELS = [
-    "Concept",
-    "Challenge",
-    "Artifact",
-    "Bestpractice",
-    "Processstage",
-    "Role",
-    "Standard",
-    "Tool",
-    "Methodology",
-    "Industry",
-]
 
 
 class ValidationQueries:

@@ -18,6 +18,7 @@ from graphrag_kg_pipeline.extraction.prompts import (
     create_extraction_template,
 )
 from graphrag_kg_pipeline.extraction.schema import (
+    LLM_EXTRACTED_ENTITY_LABELS,
     NODE_TYPES,
     PATTERNS,
     RELATIONSHIP_TYPES,
@@ -26,6 +27,7 @@ from graphrag_kg_pipeline.extraction.schema import (
 
 __all__ = [
     # Schema
+    "LLM_EXTRACTED_ENTITY_LABELS",
     "NODE_TYPES",
     "RELATIONSHIP_TYPES",
     "PATTERNS",

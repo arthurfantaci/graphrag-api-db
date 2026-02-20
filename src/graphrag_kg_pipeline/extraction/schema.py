@@ -11,6 +11,28 @@ The schema is designed for neo4j_graphrag's SimpleKGPipeline.
 from typing import Any
 
 # =============================================================================
+# LLM-EXTRACTED ENTITY LABELS (single source of truth)
+# =============================================================================
+# These labels identify entity nodes created by LLM extraction, as opposed to
+# structural nodes (Article, Chunk, Chapter, etc.) created by the pipeline.
+# Used by post-processing cleanup and validation queries.
+
+LLM_EXTRACTED_ENTITY_LABELS: frozenset[str] = frozenset(
+    {
+        "Concept",
+        "Challenge",
+        "Artifact",
+        "Bestpractice",
+        "Processstage",
+        "Role",
+        "Standard",
+        "Tool",
+        "Methodology",
+        "Industry",
+    }
+)
+
+# =============================================================================
 # NODE TYPE DEFINITIONS
 # =============================================================================
 

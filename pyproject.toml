@@ -208,6 +208,9 @@ ignore = [
 "**/chunking/*.py" = ["PLC0415", "PLR0912", "TRY300"]
 "**/models/resource.py" = ["PLR2004"]  # Magic numbers for validation thresholds
 
+# Example scripts: relaxed rules for demo code and lazy imports
+"examples/*.py" = ["PLC0415", "S106", "S603", "S607", "T201"]
+
 [tool.ruff.lint.pydocstyle]
 # Use Google-style docstrings
 # Example:

@@ -88,6 +88,21 @@ from .loaders import (
     JamaHTMLLoader,
     build_article_index,
 )
+from .models.content import (
+    Article,
+    Chapter,
+    ContentType,
+    CrossReference,
+    Glossary,
+    GlossaryTerm,
+    GuideMetadata,
+    ImageReference,
+    RelatedArticle,
+    RequirementsManagementGuide,
+    Section,
+    VideoReference,
+    WebinarReference,
+)
 
 # =============================================================================
 # NEW PIPELINE MODULES (neo4j_graphrag based)
@@ -107,21 +122,6 @@ from .models.resource import (
 )
 from .models.resource import (
     WebinarResource as WebinarResourceModel,
-)
-from .models_core import (
-    Article,
-    Chapter,
-    ContentType,
-    CrossReference,
-    Glossary,
-    GlossaryTerm,
-    GuideMetadata,
-    ImageReference,
-    RelatedArticle,
-    RequirementsManagementGuide,
-    Section,
-    VideoReference,
-    WebinarReference,
 )
 
 # Post-processing
