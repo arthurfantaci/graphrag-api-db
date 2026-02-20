@@ -241,8 +241,8 @@ graphrag-kg-pipeline/
 │   ├── scraper.py            # Async web scraper + pipeline orchestration
 │   ├── parser.py             # HTML → Markdown parser
 │   ├── exceptions.py         # Custom exception hierarchy
-│   ├── models_core.py        # Pydantic models
-│   ├── models/               # Resource models
+│   ├── models/               # Pydantic data models
+│   │   ├── content.py        # Article, Chapter, Glossary
 │   │   └── resource.py       # Image, Video, Webinar
 │   ├── chunking/             # LangChain text splitting
 │   │   ├── config.py         # HierarchicalChunkingConfig
@@ -275,8 +275,9 @@ graphrag-kg-pipeline/
 │   ├── test_loaders.py
 │   ├── test_postprocessing.py
 │   └── test_validation.py
+├── examples/                 # Usage demonstrations
+│   └── query_knowledge_graph.py
 ├── pyproject.toml            # Project configuration
-├── test_query.py             # Knowledge graph query demo
 ├── .env.example              # Environment template
 └── CLAUDE.md                 # AI assistant guidance
 ```
@@ -332,16 +333,19 @@ MATCH (c:Chunk) WHERE c.embedding IS NULL RETURN count(c)
 
 ## Querying the Knowledge Graph
 
-### Test Script (Recommended)
+### Example Script (Recommended)
 
-A ready-to-use test script is included for evaluating the knowledge graph:
+A ready-to-use example script is included for evaluating the knowledge graph:
 
 ```bash
 # Run with default query
-uv run python test_query.py
+uv run python examples/query_knowledge_graph.py
 
 # Run with custom query
-uv run python test_query.py "What is impact analysis?"
+uv run python examples/query_knowledge_graph.py "What is impact analysis?"
+
+# Custom entity search term
+uv run python examples/query_knowledge_graph.py "What is impact analysis?" --search "impact"
 ```
 
 The script demonstrates four query approaches:

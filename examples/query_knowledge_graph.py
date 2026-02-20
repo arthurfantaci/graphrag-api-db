@@ -1,53 +1,103 @@
 #!/usr/bin/env python3
-"""Test script for querying the Jama Guide knowledge graph.
+"""Query the Jama Guide knowledge graph with four retrieval strategies.
 
-This script demonstrates three query approaches:
-1. Vector similarity search on chunks
-2. Graph traversal from chunks to entities
-3. Direct entity search by name
+Demonstrates four approaches to querying a Neo4j knowledge graph built by
+the graphrag-kg pipeline:
+
+1. **Vector similarity search** — semantic matching on chunk embeddings
+2. **Chunk-to-entity traversal** — graph traversal from retrieved chunks to entities
+3. **Direct entity search** — find entities by name pattern
+4. **Relationship exploration** — show connections for a specific entity
 
 Usage:
-    uv run python test_query.py
-    uv run python test_query.py "What is impact analysis?"
+    uv run python examples/query_knowledge_graph.py
+    uv run python examples/query_knowledge_graph.py "What is impact analysis?"
+    uv run python examples/query_knowledge_graph.py "What is impact analysis?" --search traceability
+
+Requires:
+    - A populated Neo4j database (run ``graphrag-kg`` first)
+    - Environment variables: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
+    - Either VOYAGE_API_KEY (preferred) or OPENAI_API_KEY for embeddings
 """
 
 from __future__ import annotations
 
+import argparse
 import os
-import sys
 from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
-from neo4j_graphrag.embeddings import OpenAIEmbeddings
-from neo4j_graphrag.retrievers import VectorRetriever
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
 if TYPE_CHECKING:
     from neo4j import Driver
+    from neo4j_graphrag.embeddings.base import Embedder
     from neo4j_graphrag.types import RetrieverResult
 
 load_dotenv()
 
 console = Console()
 
+DEFAULT_QUERY = "What can you tell me about Requirements Tracing?"
+DEFAULT_SEARCH_TERM = "traceability"
+
 
 def get_driver() -> Driver:
-    """Create Neo4j driver from environment variables."""
+    """Create a Neo4j driver from environment variables.
+
+    Returns:
+        A Neo4j driver instance configured from NEO4J_URI, NEO4J_USERNAME,
+        and NEO4J_PASSWORD environment variables.
+    """
     uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
     username = os.getenv("NEO4J_USERNAME", "neo4j")
     password = os.getenv("NEO4J_PASSWORD", "")
     return GraphDatabase.driver(uri, auth=(username, password))
 
 
+def create_embedder() -> Embedder:
+    """Create an embedder based on available API keys.
+
+    Prefers Voyage AI (voyage-4, 1024d) when VOYAGE_API_KEY is set,
+    falling back to OpenAI text-embedding-3-small.
+
+    Returns:
+        An Embedder instance for vector similarity search.
+
+    Raises:
+        RuntimeError: If neither VOYAGE_API_KEY nor OPENAI_API_KEY is set.
+    """
+    if os.getenv("VOYAGE_API_KEY"):
+        from graphrag_kg_pipeline.embeddings.voyage import VoyageAIEmbeddings
+
+        return VoyageAIEmbeddings(input_type="query")
+
+    if os.getenv("OPENAI_API_KEY"):
+        from neo4j_graphrag.embeddings import OpenAIEmbeddings
+
+        return OpenAIEmbeddings(model="text-embedding-3-small")
+
+    msg = "Set VOYAGE_API_KEY or OPENAI_API_KEY in your .env file"
+    raise RuntimeError(msg)
+
+
 def vector_search(driver: Driver, query: str, top_k: int = 5) -> RetrieverResult:
-    """Perform vector similarity search on chunk embeddings."""
-    embedder = OpenAIEmbeddings(
-        model="text-embedding-3-small",
-        api_key=os.getenv("OPENAI_API_KEY"),
-    )
+    """Perform vector similarity search on chunk embeddings.
+
+    Args:
+        driver: Neo4j driver instance.
+        query: Natural language query string.
+        top_k: Number of results to return.
+
+    Returns:
+        Retriever result containing matched chunks with similarity scores.
+    """
+    from neo4j_graphrag.retrievers import VectorRetriever
+
+    embedder = create_embedder()
     retriever = VectorRetriever(
         driver=driver,
         index_name="chunk_embeddings",
@@ -58,7 +108,18 @@ def vector_search(driver: Driver, query: str, top_k: int = 5) -> RetrieverResult
 
 
 def get_entities_from_chunks(driver: Driver, chunk_ids: list[str]) -> list[dict]:
-    """Find entities mentioned in the retrieved chunks."""
+    """Find entities mentioned in the retrieved chunks.
+
+    Traverses MENTIONED_IN relationships from chunks to discover which
+    domain entities (Concepts, Challenges, etc.) appear in the results.
+
+    Args:
+        driver: Neo4j driver instance.
+        chunk_ids: List of Neo4j element IDs for retrieved chunks.
+
+    Returns:
+        List of entity dicts with name, label, definition, and mention count.
+    """
     with driver.session() as session:
         result = session.run(
             """
@@ -76,7 +137,19 @@ def get_entities_from_chunks(driver: Driver, chunk_ids: list[str]) -> list[dict]
 
 
 def search_entities_by_name(driver: Driver, search_term: str) -> list[dict]:
-    """Direct search for entities containing the search term."""
+    """Search for entities whose name contains the given term.
+
+    Searches across all LLM-extracted entity types (Concept, Challenge,
+    BestPractice, Standard, Methodology, Artifact, Tool) using a
+    case-sensitive CONTAINS match on the lowercased name.
+
+    Args:
+        driver: Neo4j driver instance.
+        search_term: Substring to search for in entity names.
+
+    Returns:
+        List of entity dicts with name, label, definition, and connection count.
+    """
     with driver.session() as session:
         result = session.run(
             """
@@ -98,7 +171,15 @@ def search_entities_by_name(driver: Driver, search_term: str) -> list[dict]:
 
 
 def get_related_entities(driver: Driver, entity_name: str) -> list[dict]:
-    """Get entities related to a specific entity."""
+    """Get all entities related to a specific entity via any relationship.
+
+    Args:
+        driver: Neo4j driver instance.
+        entity_name: Lowercase entity name to look up.
+
+    Returns:
+        List of relationship dicts with type, direction, and related entity info.
+    """
     with driver.session() as session:
         result = session.run(
             """
@@ -119,7 +200,14 @@ def get_related_entities(driver: Driver, entity_name: str) -> list[dict]:
 
 
 def display_vector_results(results: RetrieverResult) -> list[str | None]:
-    """Display vector search results and return chunk IDs."""
+    """Display vector search results and return chunk element IDs.
+
+    Args:
+        results: Retriever result from vector similarity search.
+
+    Returns:
+        List of chunk element IDs (some may be None if metadata is missing).
+    """
     console.print("\n[bold green]1. Vector Similarity Search[/] (semantic match)")
     console.print("-" * 60)
 
@@ -138,7 +226,13 @@ def display_vector_results(results: RetrieverResult) -> list[str | None]:
 
 
 def display_entity_table(entities: list[dict], title: str, count_col: str) -> None:
-    """Display entities in a formatted table."""
+    """Display entities in a formatted Rich table.
+
+    Args:
+        entities: List of entity dicts from a query result.
+        title: Section title displayed above the table.
+        count_col: Header label for the numeric column (e.g., "Mentions").
+    """
     console.print(f"\n\n[bold green]{title}[/]")
     console.print("-" * 60)
 
@@ -164,7 +258,12 @@ def display_entity_table(entities: list[dict], title: str, count_col: str) -> No
 
 
 def display_relationships(relationships: list[dict], entity_name: str) -> None:
-    """Display relationships for an entity."""
+    """Display relationships for an entity in a formatted Rich table.
+
+    Args:
+        relationships: List of relationship dicts from get_related_entities.
+        entity_name: The entity name used as the query center.
+    """
     console.print(f"\n[bold green]4. Relationships for '{entity_name}'[/]")
     console.print("-" * 60)
 
@@ -188,15 +287,39 @@ def display_relationships(relationships: list[dict], entity_name: str) -> None:
     console.print(table)
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments.
+
+    Returns:
+        Parsed arguments with query and search_term attributes.
+    """
+    parser = argparse.ArgumentParser(
+        description="Query the Jama Guide knowledge graph",
+    )
+    parser.add_argument(
+        "query",
+        nargs="?",
+        default=DEFAULT_QUERY,
+        help="Natural language query for vector search (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--search",
+        default=DEFAULT_SEARCH_TERM,
+        help="Term for direct entity name search (default: %(default)s)",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
     """Run the knowledge graph query demonstration."""
-    query = sys.argv[1] if len(sys.argv) > 1 else "What can you tell me about Requirements Tracing?"
-    console.print(Panel(f"[bold cyan]Query:[/] {query}", title="Jama Guide Knowledge Graph Test"))
+    args = parse_args()
+
+    console.print(Panel(f"[bold cyan]Query:[/] {args.query}", title="Jama Guide Knowledge Graph"))
 
     driver = get_driver()
     try:
         # 1. Vector similarity search
-        results = vector_search(driver, query)
+        results = vector_search(driver, args.query)
         chunk_ids = display_vector_results(results)
 
         # 2. Entities from retrieved chunks
@@ -205,10 +328,10 @@ def main() -> None:
         display_entity_table(entities, "2. Entities Mentioned in Retrieved Chunks", "Mentions")
 
         # 3. Direct entity search
-        direct_results = search_entities_by_name(driver, "trac")
+        direct_results = search_entities_by_name(driver, args.search)
         display_entity_table(
             direct_results,
-            "3. Direct Entity Search (name contains 'trac')",
+            f"3. Direct Entity Search (name contains '{args.search}')",
             "Connections",
         )
 
@@ -218,7 +341,7 @@ def main() -> None:
             relationships = get_related_entities(driver, top_entity)
             display_relationships(relationships, top_entity)
 
-        console.print("\n[bold green]✓ Query test complete![/]")
+        console.print("\n[bold green]Query complete.[/]")
     finally:
         driver.close()
 

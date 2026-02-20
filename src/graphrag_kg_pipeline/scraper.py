@@ -32,7 +32,7 @@ from .config import (
     ChapterConfig,
 )
 from .fetcher import Fetcher, FetcherConfig, create_fetcher
-from .models_core import (
+from .models.content import (
     Article,
     Chapter,
     ContentType,

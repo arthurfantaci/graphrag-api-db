@@ -72,7 +72,7 @@ class TestBuildArticleIndex:
     def test_build_empty_guide(self) -> None:
         """Test building index from empty guide."""
         from graphrag_kg_pipeline.loaders.index_builder import build_article_index
-        from graphrag_kg_pipeline.models_core import (
+        from graphrag_kg_pipeline.models.content import (
             Glossary,
             GuideMetadata,
             RequirementsManagementGuide,
@@ -96,7 +96,7 @@ class TestBuildArticleIndex:
     def test_build_index_with_content_flag(self) -> None:
         """Test building index with include_content=False."""
         from graphrag_kg_pipeline.loaders.index_builder import build_article_index
-        from graphrag_kg_pipeline.models_core import (
+        from graphrag_kg_pipeline.models.content import (
             Article,
             Chapter,
             ContentType,

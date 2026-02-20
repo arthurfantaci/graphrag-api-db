@@ -180,7 +180,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
    - `parse_glossary()` - Handles multiple glossary HTML patterns
    - `discover_articles()` - Finds article links from chapter overview pages
 
-5. **models_core.py** - Pydantic models with computed fields for word/character counts.
+5. **models/content.py** - Pydantic models with computed fields for word/character counts.
 
 6. **exceptions.py** - Custom exception hierarchy including `Neo4jConfigError`.
 
