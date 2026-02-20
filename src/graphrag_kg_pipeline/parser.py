@@ -8,7 +8,8 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
-from .config import BASE_URL
+from .config import BASE_URL, ArticleConfig, ChapterConfig
+from .exceptions import ScraperError
 from .models.content import (
     CrossReference,
     ImageReference,
@@ -279,37 +280,102 @@ class HTMLParser:
 
         return terms
 
-    def discover_articles(self, html: str, chapter_slug: str) -> list[dict]:
-        """Discover article links from a chapter overview or TOC page.
+    def parse_chapter_menu(self, html: str) -> list[ChapterConfig]:
+        """Parse the #chapter-menu TOC to discover all chapters and articles.
 
-        Returns list of dicts with:
-        - title: Article title
-        - slug: URL slug
-        - url: Full URL
+        Extracts the complete chapter/article structure from the guide's main
+        page by parsing the ``div#chapter-menu`` element. Each chapter header
+        is an ``li.expand`` with a ``<strong>N.</strong>`` number, and its
+        articles are in the adjacent ``div.expand-list``. Glossary entries
+        (``li.glossary``) are skipped.
+
+        Args:
+            html: Raw HTML of the guide's main page.
+
+        Returns:
+            List of fully-populated ChapterConfig objects.
+
+        Raises:
+            ScraperError: If ``#chapter-menu`` is not found in the HTML.
         """
-        soup = BeautifulSoup(html, "lxml")
-        articles = []
-        seen_slugs = set()
+        # Use html.parser (not lxml) because the source HTML has <div> elements
+        # inside <ul>, which is invalid. lxml restructures the tree and breaks
+        # sibling relationships; html.parser preserves the original nesting.
+        soup = BeautifulSoup(html, "html.parser")
 
-        # Find all internal links that match the chapter pattern
-        pattern = re.compile(rf"/requirements-management-guide/{re.escape(chapter_slug)}/([^/]+)/?")
+        menu = soup.select_one("div#chapter-menu")
+        if not menu:
+            msg = "Could not find chapter menu (#chapter-menu) on guide page"
+            raise ScraperError(msg)
 
-        for link in soup.find_all("a", href=True):
-            href = link["href"]
-            match = pattern.search(href)
-            if match:
-                slug = match.group(1)
-                if slug not in seen_slugs:
-                    seen_slugs.add(slug)
+        chapters: list[ChapterConfig] = []
+
+        for chapter_li in menu.select("li.expand"):
+            strong = chapter_li.find("strong")
+            if not strong:
+                continue
+
+            number_text = strong.get_text(strip=True).rstrip(".")
+            try:
+                chapter_number = int(number_text)
+            except ValueError:
+                continue
+
+            # Title is the li's direct text content, excluding the <strong> tag
+            title_parts = []
+            for child in chapter_li.children:
+                if isinstance(child, NavigableString):
+                    text = str(child).strip()
+                    if text:
+                        title_parts.append(text)
+            chapter_title = " ".join(title_parts).replace("\xa0", " ").strip()
+
+            chapter_slug = chapter_li.get("id", "")
+
+            # Find the article list div sharing the same id
+            expand_list = menu.find("div", class_="expand-list", id=chapter_slug)
+            if not expand_list:
+                expand_list = chapter_li.find_next("div", class_="expand-list")
+
+            articles: list[ArticleConfig] = []
+            if expand_list:
+                for article_li in expand_list.select("li"):
+                    if "glossary" in (article_li.get("class") or []):
+                        continue
+
+                    link = article_li.find("a", href=True)
+                    if not link:
+                        continue
+
+                    border_span = article_li.select_one("span.border")
+                    article_number = 0
+                    if border_span:
+                        border_text = border_span.get_text(strip=True)
+                        article_number = int(border_text) if border_text else 0
+
+                    article_url = link["href"]
+                    article_title = link.get_text(strip=True).replace("\xa0", " ").strip()
+                    article_slug = article_li.get("id", "")
+
                     articles.append(
-                        {
-                            "title": link.get_text(strip=True),
-                            "slug": slug,
-                            "url": urljoin(self.base_url, href),
-                        }
+                        ArticleConfig(
+                            number=article_number,
+                            title=article_title,
+                            slug=article_slug,
+                            url=article_url,
+                        )
                     )
 
-        return articles
+            chapters.append(
+                ChapterConfig(
+                    number=chapter_number,
+                    title=chapter_title,
+                    slug=chapter_slug,
+                    articles=articles,
+                )
+            )
+
+        return chapters
 
     def _extract_title(self, soup: BeautifulSoup) -> str:
         """Extract the page title."""
