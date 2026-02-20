@@ -162,7 +162,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 
 **Scraping (Stage 1):**
 
-1. **config.py** - URL configurations, chapter/article mappings, rate limiting settings. `ChapterConfig` and `ArticleConfig` dataclasses define the guide structure.
+1. **config.py** - URL constants (`BASE_URL`, `GLOSSARY_URL`), rate limiting settings. `ChapterConfig` and `ArticleConfig` dataclasses define the guide structure (populated dynamically from the TOC).
 
 2. **fetcher.py** - Protocol-based fetcher abstraction (PEP 544 structural subtyping):
    - `Fetcher` - Protocol defining the interface with async context manager support
@@ -172,13 +172,14 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
    - `create_fetcher()` - Factory function for instantiation
 
 3. **scraper.py** - `JamaGuideScraper` orchestrates scraping, `run_scraper()` runs full 5-stage pipeline:
-   - `scrape_all()` → `_discover_all_articles()` → `_scrape_all_chapters()` → `_scrape_glossary()`
+   - `scrape_all()` → `_discover_guide_structure()` → `_scrape_all_chapters()` → `_scrape_glossary()`
+   - Dynamic discovery from `#chapter-menu` TOC (single HTTP request replaces per-chapter discovery)
    - Uses fetcher abstraction via dependency injection
 
 4. **parser.py** - `HTMLParser` converts HTML to Markdown and extracts metadata:
    - `parse_article()` - Extracts title, markdown, sections, cross-references, images, videos
    - `parse_glossary()` - Handles multiple glossary HTML patterns
-   - `discover_articles()` - Finds article links from chapter overview pages
+   - `parse_chapter_menu()` - Parses `#chapter-menu` TOC for dynamic chapter/article discovery
 
 5. **models/content.py** - Pydantic models with computed fields for word/character counts.
 
@@ -259,7 +260,8 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - **Lazy Initialization** - Playwright browser only started on first request
 - Async with semaphore concurrency (default 3 parallel requests) for respectful scraping
 - Exponential backoff retry on HTTP errors (max 3 retries)
-- Articles auto-discovered from chapter overviews when not pre-configured
+- **Dynamic TOC Discovery** - All chapters/articles discovered from `#chapter-menu` on the guide's main page (single HTTP request, no static fallback)
+- Uses `html.parser` (not lxml) for TOC parsing because the source HTML has `<div>` inside `<ul>` — lxml restructures this invalid nesting
 
 **Knowledge Graph Layer:**
 - **Schema-Constrained Extraction** - 10 node types and 10 relationship types prevent schema drift
@@ -274,6 +276,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 **Data Quality:**
 - **Validation Framework** - Comprehensive checks for orphans, duplicates, and invalid patterns
 - **Repair Operations** - Safe fixes with dry-run preview mode
+- **Report Archiving** - `ValidationReport.save()` auto-archives existing reports with ISO 8601 timestamps (e.g. `validation_report_2026-02-20T001437.md`) before writing the new one
 - **Vector Embeddings** - Voyage AI voyage-4 (preferred) or OpenAI text-embedding-3-small for semantic search
 - **Fix ordering** - delete degenerate → re-index → chunk_ids → webinar titles → relabel → backfill MENTIONED_IN → definitions → generic → plurals
 - **Pass/fail checks** - orphan_chunks, duplicates, chunk_ids, chunk_index, plural_duplicates (industry count advisory)

@@ -7,7 +7,6 @@ Features:
 - Progress tracking with Rich
 """
 
-from dataclasses import replace
 from datetime import UTC, datetime
 import json
 from pathlib import Path
@@ -23,14 +22,14 @@ from rich.progress import (
 )
 
 from .config import (
-    CHAPTERS,
+    BASE_URL,
     GLOSSARY_URL,
     MAX_CONCURRENT_REQUESTS,
     RATE_LIMIT_DELAY_SECONDS,
     REQUEST_TIMEOUT_SECONDS,
-    ArticleConfig,
     ChapterConfig,
 )
+from .exceptions import ScraperError
 from .fetcher import Fetcher, FetcherConfig, create_fetcher
 from .models.content import (
     Article,
@@ -104,8 +103,8 @@ class JamaGuideScraper:
         console.print(f"Fetcher mode: {mode}")
 
         async with create_fetcher(self._use_browser, self._config) as fetcher:
-            # First, discover any missing articles from chapter overviews
-            chapters_config = await self._discover_all_articles(fetcher)
+            # Discover full chapter/article structure from the guide's TOC
+            chapters_config = await self._discover_guide_structure(fetcher)
 
             # Scrape all chapters
             chapters = await self._scrape_all_chapters(fetcher, chapters_config)
@@ -128,50 +127,37 @@ class JamaGuideScraper:
 
             return guide
 
-    async def _discover_all_articles(self, fetcher: Fetcher) -> list[ChapterConfig]:
-        """Discover articles by scraping chapter overview pages.
+    async def _discover_guide_structure(self, fetcher: Fetcher) -> list[ChapterConfig]:
+        """Discover all chapters and articles from the guide's TOC page.
+
+        Fetches the main guide page and parses ``div#chapter-menu`` to build
+        the complete chapter/article structure dynamically.
 
         Args:
             fetcher: The fetcher to use for HTTP requests.
 
         Returns:
-            List of chapter configurations with discovered articles.
+            List of chapter configurations with all articles populated.
+
+        Raises:
+            ScraperError: If the guide page cannot be fetched or parsed.
         """
-        console.print("\n[yellow]Discovering articles from chapter overviews...[/]")
+        console.print("\n[yellow]Discovering guide structure from TOC...[/]")
 
-        updated_chapters = []
+        html = await fetcher.fetch(BASE_URL)
+        if not html:
+            msg = f"Failed to fetch guide page: {BASE_URL}"
+            raise ScraperError(msg)
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Discovering...", total=len(CHAPTERS))
+        chapters = self.parser.parse_chapter_menu(html)
+        if not chapters:
+            msg = "No chapters found in guide TOC"
+            raise ScraperError(msg)
 
-            for chapter_config in CHAPTERS:
-                # If chapter only has overview, try to discover more
-                current_chapter = chapter_config
-                if len(chapter_config.articles) <= 1:
-                    html = await fetcher.fetch(chapter_config.overview_url)
-                    if html:
-                        discovered = self.parser.discover_articles(html, chapter_config.slug)
-                        if discovered:
-                            console.print(
-                                f"  Found {len(discovered)} articles "
-                                f"in Chapter {chapter_config.number}"
-                            )
-                            # Create new chapter config with discovered articles
-                            new_articles = [ArticleConfig(0, "Overview", "")]
-                            for i, art in enumerate(discovered, 1):
-                                new_articles.append(ArticleConfig(i, art["title"], art["slug"]))
-                            current_chapter = replace(chapter_config, articles=new_articles)
+        total_articles = sum(len(ch.articles) for ch in chapters)
+        console.print(f"  Found {len(chapters)} chapters, {total_articles} articles")
 
-                updated_chapters.append(current_chapter)
-                progress.advance(task)
-
-        return updated_chapters
+        return chapters
 
     async def _scrape_all_chapters(
         self,
