@@ -118,6 +118,9 @@ class JamaGuideScraper:
                 glossary=glossary,
             )
 
+            # Enrich webinar thumbnails via OG image fallback
+            await self._enrich_webinar_thumbnails(guide, fetcher)
+
             console.print("\n[bold green]✓ Scraping complete![/]")
             console.print(f"  Chapters: {len(guide.chapters)}")
             console.print(f"  Total articles: {guide.total_articles}")
@@ -256,6 +259,67 @@ class JamaGuideScraper:
             overview_url=config.overview_url,
             articles=articles,
         )
+
+    async def _enrich_webinar_thumbnails(
+        self,
+        guide: RequirementsManagementGuide,
+        fetcher: Fetcher,
+    ) -> None:
+        """Enrich webinar references that have no thumbnail via OG image fallback.
+
+        Iterates all webinars across the guide, collects those with
+        ``thumbnail_url is None``, deduplicates by URL, fetches each unique
+        landing page, and propagates the ``og:image`` back to every reference.
+
+        Args:
+            guide: The scraped guide whose webinars may need enrichment.
+            fetcher: The fetcher to use for HTTP requests.
+        """
+        # Collect webinars with null thumbnails, grouped by URL
+        url_to_refs: dict[str, list] = {}
+        for chapter in guide.chapters:
+            for article in chapter.articles:
+                for webinar in article.webinars:
+                    if webinar.thumbnail_url is None:
+                        url_to_refs.setdefault(webinar.url, []).append(webinar)
+
+        if not url_to_refs:
+            console.print("  [dim]All webinar thumbnails already present[/]")
+            return
+
+        console.print(
+            f"\n[yellow]Enriching webinar thumbnails ({len(url_to_refs)} unique URLs)...[/]"
+        )
+
+        enriched = 0
+        for url, refs in url_to_refs.items():
+            try:
+                html = await fetcher.fetch(url)
+                if not html:
+                    console.print(f"  [dim]No response: {url}[/]")
+                    continue
+
+                og_image = self.parser.extract_og_image(html)
+                if not og_image:
+                    console.print(f"  [dim]No og:image: {url}[/]")
+                    continue
+
+                for ref in refs:
+                    ref.thumbnail_url = og_image
+                enriched += len(refs)
+                console.print(f"  [green]✓[/] {url} → {len(refs)} ref(s)")
+
+            except Exception:
+                console.print(f"  [red]Failed to fetch: {url}[/]")
+
+        still_null = sum(
+            1
+            for ch in guide.chapters
+            for art in ch.articles
+            for w in art.webinars
+            if w.thumbnail_url is None
+        )
+        console.print(f"  Enriched {enriched} refs, {still_null} still without thumbnail")
 
     async def _scrape_glossary(self, fetcher: Fetcher) -> Glossary | None:
         """Scrape the glossary page.
