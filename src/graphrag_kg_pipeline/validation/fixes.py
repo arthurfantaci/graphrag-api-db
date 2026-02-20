@@ -282,7 +282,7 @@ async def fix_mislabeled_entities(
     for entity in entities:
         relabel_query = """
         MATCH (c:Challenge) WHERE elementId(c) = $element_id
-        // Check no Concept exists with same name
+        WITH c
         WHERE NOT EXISTS {
             MATCH (existing:Concept {name: c.name})
         }
