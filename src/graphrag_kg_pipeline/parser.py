@@ -377,6 +377,27 @@ class HTMLParser:
 
         return chapters
 
+    def extract_og_image(self, html: str) -> str | None:
+        """Extract the Open Graph image URL from an HTML page.
+
+        Parses ``<meta property="og:image" content="...">`` to recover a
+        thumbnail when the source article has no ``<img>`` inside the webinar
+        link.
+
+        Args:
+            html: Raw HTML of the page to parse.
+
+        Returns:
+            The ``og:image`` URL string, or ``None`` if not found or empty.
+        """
+        soup = BeautifulSoup(html, "lxml")
+        meta = soup.find("meta", property="og:image")
+        if meta and isinstance(meta, Tag):
+            content = meta.get("content", "")
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+        return None
+
     def _extract_title(self, soup: BeautifulSoup) -> str:
         """Extract the page title."""
         # Try h1 first

@@ -1,11 +1,24 @@
-"""Tests for dynamic guide structure discovery via #chapter-menu TOC parsing."""
+"""Tests for scraper: TOC discovery, OG image extraction, and thumbnail enrichment."""
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING, Self
 
 import pytest
 
 from graphrag_kg_pipeline.exceptions import ScraperError
+from graphrag_kg_pipeline.models.content import (
+    Article,
+    Chapter,
+    ContentType,
+    RequirementsManagementGuide,
+    WebinarReference,
+)
 from graphrag_kg_pipeline.parser import HTMLParser
+from graphrag_kg_pipeline.scraper import JamaGuideScraper
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 # Representative HTML fixture modeled on the live Jama guide's #chapter-menu.
 # Includes: 3 chapters, a cross-chapter URL (Ch3 art1 → Ch2 path), overview
@@ -153,3 +166,173 @@ class TestParseChapterMenu:
         art1 = ch1.articles[1]
         assert "\xa0" not in art1.title
         assert art1.title == "What is Requirements Management?"
+
+
+# ---------------------------------------------------------------------------
+# OG Image Extraction Tests
+# ---------------------------------------------------------------------------
+
+
+class TestExtractOgImage:
+    """Tests for HTMLParser.extract_og_image()."""
+
+    def test_standard_og_image(self, parser: HTMLParser) -> None:
+        """Extract URL from a valid og:image meta tag."""
+        html = '<html><head><meta property="og:image" content="https://example.com/img.jpg"></head></html>'
+        assert parser.extract_og_image(html) == "https://example.com/img.jpg"
+
+    def test_missing_og_image(self, parser: HTMLParser) -> None:
+        """Return None when no og:image tag is present."""
+        html = "<html><head><title>No OG</title></head><body></body></html>"
+        assert parser.extract_og_image(html) is None
+
+    def test_empty_og_image_content(self, parser: HTMLParser) -> None:
+        """Return None when the content attribute is empty."""
+        html = '<html><head><meta property="og:image" content=""></head></html>'
+        assert parser.extract_og_image(html) is None
+
+    def test_whitespace_og_image_content(self, parser: HTMLParser) -> None:
+        """Return None when the content attribute is whitespace-only."""
+        html = '<html><head><meta property="og:image" content="   "></head></html>'
+        assert parser.extract_og_image(html) is None
+
+    def test_og_image_with_full_page(self, parser: HTMLParser) -> None:
+        """Extract og:image from a realistic full-page HTML document."""
+        html = """\
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Webinar | Jama Software</title>
+            <meta property="og:type" content="website">
+            <meta property="og:title" content="Requirements Webinar">
+            <meta property="og:image" content="https://resources.jamasoftware.com/thumb.png">
+            <meta property="og:url" content="https://resources.jamasoftware.com/webinar/example">
+        </head>
+        <body><h1>Webinar Page</h1></body>
+        </html>
+        """
+        assert parser.extract_og_image(html) == "https://resources.jamasoftware.com/thumb.png"
+
+
+# ---------------------------------------------------------------------------
+# Webinar Thumbnail Enrichment Tests
+# ---------------------------------------------------------------------------
+
+WEBINAR_URL_A = "https://resources.jamasoftware.com/webinar/test-webinar-a"
+WEBINAR_URL_B = "https://resources.jamasoftware.com/webinar/test-webinar-b"
+OG_IMAGE_A = "https://resources.jamasoftware.com/og-a.jpg"
+OG_IMAGE_B = "https://resources.jamasoftware.com/og-b.jpg"
+
+
+class MockFetcher:
+    """Minimal Fetcher protocol implementation for testing."""
+
+    def __init__(self, responses: dict[str, str | None]) -> None:
+        self.responses = responses
+        self.fetch_count: dict[str, int] = {}
+
+    async def fetch(self, url: str) -> str | None:
+        """Return pre-configured HTML for the given URL."""
+        self.fetch_count[url] = self.fetch_count.get(url, 0) + 1
+        return self.responses.get(url)
+
+    async def __aenter__(self) -> Self:
+        """Enter async context."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Exit async context."""
+
+
+def _og_page(image_url: str) -> str:
+    """Build a minimal HTML page with an og:image meta tag."""
+    return f'<html><head><meta property="og:image" content="{image_url}"></head></html>'
+
+
+def _make_guide(webinars_by_article: list[list[WebinarReference]]) -> RequirementsManagementGuide:
+    """Build a minimal guide with articles containing the given webinars."""
+    articles = []
+    for i, webinars in enumerate(webinars_by_article):
+        articles.append(
+            Article(
+                article_id=f"ch1-art{i}",
+                chapter_number=1,
+                article_number=i,
+                title=f"Article {i}",
+                url=f"https://example.com/art{i}",
+                content_type=ContentType.ARTICLE,
+                markdown_content="Content.",
+                webinars=webinars,
+            )
+        )
+    chapter = Chapter(
+        chapter_number=1,
+        title="Test Chapter",
+        overview_url="https://example.com/overview",
+        articles=articles,
+    )
+    return RequirementsManagementGuide(chapters=[chapter])
+
+
+class TestEnrichWebinarThumbnails:
+    """Tests for JamaGuideScraper._enrich_webinar_thumbnails()."""
+
+    @pytest.mark.asyncio
+    async def test_enriches_null_thumbnails(self) -> None:
+        """Propagate OG image to webinar refs with null thumbnail."""
+        webinar = WebinarReference(url=WEBINAR_URL_A, title="Webinar A")
+        guide = _make_guide([[webinar]])
+
+        fetcher = MockFetcher({WEBINAR_URL_A: _og_page(OG_IMAGE_A)})
+        scraper = JamaGuideScraper()
+        await scraper._enrich_webinar_thumbnails(guide, fetcher)
+
+        assert webinar.thumbnail_url == OG_IMAGE_A
+
+    @pytest.mark.asyncio
+    async def test_deduplicates_urls(self) -> None:
+        """Same URL in multiple articles triggers a single fetch."""
+        w1 = WebinarReference(url=WEBINAR_URL_A, title="Webinar A copy 1")
+        w2 = WebinarReference(url=WEBINAR_URL_A, title="Webinar A copy 2")
+        guide = _make_guide([[w1], [w2]])
+
+        fetcher = MockFetcher({WEBINAR_URL_A: _og_page(OG_IMAGE_A)})
+        scraper = JamaGuideScraper()
+        await scraper._enrich_webinar_thumbnails(guide, fetcher)
+
+        assert w1.thumbnail_url == OG_IMAGE_A
+        assert w2.thumbnail_url == OG_IMAGE_A
+        assert fetcher.fetch_count[WEBINAR_URL_A] == 1
+
+    @pytest.mark.asyncio
+    async def test_skips_existing_thumbnails(self) -> None:
+        """Webinars with existing thumbnails are not re-fetched."""
+        existing = WebinarReference(
+            url=WEBINAR_URL_A, title="Already has thumb", thumbnail_url="https://existing.jpg"
+        )
+        guide = _make_guide([[existing]])
+
+        fetcher = MockFetcher({WEBINAR_URL_A: _og_page(OG_IMAGE_A)})
+        scraper = JamaGuideScraper()
+        await scraper._enrich_webinar_thumbnails(guide, fetcher)
+
+        assert existing.thumbnail_url == "https://existing.jpg"
+        assert WEBINAR_URL_A not in fetcher.fetch_count
+
+    @pytest.mark.asyncio
+    async def test_handles_fetch_failure(self) -> None:
+        """Fetcher returning None does not crash; thumbnail stays null."""
+        webinar = WebinarReference(url=WEBINAR_URL_B, title="Webinar B")
+        guide = _make_guide([[webinar]])
+
+        fetcher = MockFetcher({WEBINAR_URL_B: None})
+        scraper = JamaGuideScraper()
+        await scraper._enrich_webinar_thumbnails(guide, fetcher)
+
+        assert webinar.thumbnail_url is None
