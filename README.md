@@ -1,5 +1,10 @@
 # GraphRAG Knowledge Graph Pipeline
 
+[![CI](https://github.com/arthurfantaci/graphrag-api-db/actions/workflows/ci.yml/badge.svg)](https://github.com/arthurfantaci/graphrag-api-db/actions/workflows/ci.yml)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-3776ab.svg?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg?logo=ruff)](https://docs.astral.sh/ruff/)
+
 A Python ETL pipeline that scrapes Jama Software's **"The Essential Guide to Requirements Management and Traceability"** and loads it into a Neo4j knowledge graph using the `neo4j_graphrag` library for GraphRAG retrieval.
 
 ## Features

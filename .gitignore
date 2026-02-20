@@ -78,3 +78,6 @@ logs/
 # Enrichment cache (checkpoint files)
 .enrichment_cache/
 test_output/
+
+# Local documentation (research notes, internal analysis)
+docs/
