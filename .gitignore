@@ -35,6 +35,9 @@ ENV/
 # UV
 .uv/
 
+# Claude Code
+.claude/
+
 # IDE
 .idea/
 *.swp
