@@ -126,6 +126,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 │  │ 7. LangExtractAugmenter.augment() — source grounding (optional) │  │
 │  │ 8. CommunityDetector.detect_communities() — Leiden clustering   │  │
 │  │ 9. CommunitySummarizer.summarize_communities() — LLM summaries  │  │
+│  │ 10. CommunityEmbedder.embed_community_summaries() — vectors   │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                              ↓                                           │
 │  Stage 4: SUPPLEMENT (Graph Structure)                                   │
@@ -224,30 +225,33 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 
 16. **postprocessing/langextract_augmenter.py** - `LangExtractAugmenter`: post-extraction entity augmentation with source grounding (text span provenance).
 
-**Graph Algorithms (Stage 3, steps 8-9):**
+**Graph Algorithms (Stage 3, steps 8-10):**
 
 17. **graph/community_detection.py** - `CommunityDetector`: Leiden community detection using `leidenalg` + `igraph` on semantic edges only.
 
 18. **graph/community_summarizer.py** - `CommunitySummarizer`: LLM-generated community summaries (gpt-4o-mini), creates Community nodes linked via IN_COMMUNITY.
 
+19. **graph/community_embedder.py** - `CommunityEmbedder`: Voyage AI voyage-4 embeddings for Community node summaries, enables vector search over communities.
+
 **Graph Building (Stage 4):**
 
-19. **graph/supplementary.py** - `SupplementaryGraphBuilder`:
+20. **graph/supplementary.py** - `SupplementaryGraphBuilder`:
     - Chapter structure, Resource nodes, Glossary-to-concept linking
 
-20. **graph/constraints.py** - `ConstraintManager` for Neo4j indexes and constraints.
+21. **graph/constraints.py** - `ConstraintManager` for Neo4j indexes and constraints. Also provides `create_community_vector_index()` for `community_summary_embeddings` vector index (1024d cosine).
 
 **Validation (Stage 5):**
 
-21. **validation/queries.py** - `ValidationQueries` class with Cypher checks.
+22. **validation/queries.py** - `ValidationQueries` class with Cypher checks.
 
-22. **validation/fixes.py** - `ValidationFixer` for data repair operations.
+23. **validation/fixes.py** - `ValidationFixer` for data repair operations.
 
-23. **validation/reporter.py** - `ValidationReporter` for report generation.
+24. **validation/reporter.py** - `ValidationReporter` for report generation.
 
 ## Key Design Decisions
 
 **Neo4j Constraint Compatibility:**
+- `ExtractionGleaner._merge_gleaned_results()` MERGE pattern must include `__Entity__` label and set `__KGBuilder__` on creation — without these, gleaned entities are invisible to entity resolver and dedup
 - neo4j_graphrag 1.13.0+ uses `CREATE` + `apoc.create.addLabels()`, NOT `MERGE` for entities
 - Entity-type uniqueness constraints (Concept.name, Challenge.name, etc.) MUST NOT exist — they cause silent batch rollbacks via IndexEntryConflictException
 - Only structural constraints are safe: Article, Chunk, Chapter, Image, Video, Webinar, Definition
