@@ -1,4 +1,4 @@
-"""Test suite for jama-guide-scraper.
+"""Test suite for graphrag-kg-pipeline.
 
 This package contains comprehensive tests for all modules:
 - test_models: Pydantic data models

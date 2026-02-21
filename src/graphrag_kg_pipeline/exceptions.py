@@ -1,4 +1,4 @@
-"""Custom exceptions for the Jama Guide Scraper.
+"""Custom exceptions for the Guide Scraper.
 
 Provides a hierarchy of exceptions for different error conditions:
 - ScraperError: Base exception for all scraper errors

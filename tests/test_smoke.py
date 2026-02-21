@@ -26,13 +26,13 @@ def test_core_exports_available() -> None:
     from graphrag_kg_pipeline import (
         NODE_TYPES,
         RELATIONSHIP_TYPES,
-        JamaGuideScraper,
-        JamaKGPipelineConfig,
+        GuideScraper,
+        KGPipelineConfig,
         run_scraper,
     )
 
-    assert JamaGuideScraper is not None
-    assert JamaKGPipelineConfig is not None
+    assert GuideScraper is not None
+    assert KGPipelineConfig is not None
     assert run_scraper is not None
     assert isinstance(NODE_TYPES, dict)
     assert isinstance(RELATIONSHIP_TYPES, dict)

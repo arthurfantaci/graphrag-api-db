@@ -1,4 +1,4 @@
-"""SimpleKGPipeline factory for Jama Guide extraction.
+"""SimpleKGPipeline factory for requirements guide extraction.
 
 This module provides configuration and factory functions for creating
 neo4j_graphrag SimpleKGPipeline instances configured for the
@@ -30,8 +30,8 @@ logger = structlog.get_logger(__name__)
 
 
 @dataclass
-class JamaKGPipelineConfig:
-    """Configuration for the Jama Knowledge Graph pipeline.
+class KGPipelineConfig:
+    """Configuration for the Knowledge Graph pipeline.
 
     Consolidates all configuration for Neo4j connection, LLM providers,
     embedding models, and chunking settings.
@@ -85,7 +85,7 @@ class JamaKGPipelineConfig:
     node_to_chunk_relationship: str = "MENTIONED_IN"
 
     @classmethod
-    def from_env(cls) -> "JamaKGPipelineConfig":
+    def from_env(cls) -> "KGPipelineConfig":
         """Create configuration from environment variables.
 
         Reads from standard environment variables:
@@ -143,7 +143,7 @@ class JamaKGPipelineConfig:
         }
 
 
-def create_neo4j_driver(config: JamaKGPipelineConfig) -> "Driver":
+def create_neo4j_driver(config: KGPipelineConfig) -> "Driver":
     """Create a Neo4j driver from configuration.
 
     Args:
@@ -160,7 +160,7 @@ def create_neo4j_driver(config: JamaKGPipelineConfig) -> "Driver":
     )
 
 
-def create_async_neo4j_driver(config: JamaKGPipelineConfig) -> "Driver":
+def create_async_neo4j_driver(config: KGPipelineConfig) -> "Driver":
     """Create an async Neo4j driver from configuration.
 
     Args:
@@ -177,10 +177,10 @@ def create_async_neo4j_driver(config: JamaKGPipelineConfig) -> "Driver":
     )
 
 
-def create_jama_kg_pipeline(
-    config: JamaKGPipelineConfig,
+def create_kg_pipeline(
+    config: KGPipelineConfig,
 ) -> "SimpleKGPipeline":
-    """Create a configured SimpleKGPipeline for Jama Guide extraction.
+    """Create a configured SimpleKGPipeline for requirements guide extraction.
 
     Factory function that assembles all components:
     - Neo4j driver and connection
@@ -197,15 +197,15 @@ def create_jama_kg_pipeline(
         Configured SimpleKGPipeline ready for processing.
 
     Example:
-        >>> config = JamaKGPipelineConfig.from_env()
-        >>> pipeline = create_jama_kg_pipeline(config)
+        >>> config = KGPipelineConfig.from_env()
+        >>> pipeline = create_kg_pipeline(config)
         >>> await pipeline.run(text="...")
     """
     from neo4j_graphrag.embeddings import OpenAIEmbeddings
     from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
     from neo4j_graphrag.llm import OpenAILLM
 
-    logger.info("Creating Jama KG pipeline", config=config.to_dict())
+    logger.info("Creating KG pipeline", config=config.to_dict())
 
     # Create Neo4j driver
     driver = create_neo4j_driver(config)
@@ -392,7 +392,7 @@ async def process_article_with_pipeline(
 
 async def process_guide_with_pipeline(
     guide: "RequirementsManagementGuide",
-    config: JamaKGPipelineConfig,
+    config: KGPipelineConfig,
     output_dir: Path | None = None,  # noqa: ARG001 - reserved for future use
 ) -> dict[str, Any]:
     """Process all articles in the guide through the pipeline.
@@ -415,7 +415,7 @@ async def process_guide_with_pipeline(
     )
 
     # Create pipeline
-    pipeline = create_jama_kg_pipeline(config)
+    pipeline = create_kg_pipeline(config)
 
     # Create gleaner (reused across all articles to avoid per-article driver creation)
     gleaner = None

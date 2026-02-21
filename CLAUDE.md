@@ -102,13 +102,13 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 │                                                                          │
 │  Stage 1: SCRAPE                                                         │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ JamaGuideScraper → Fetcher (httpx/Playwright) → HTML Parser       │  │
+│  │ GuideScraper → Fetcher (httpx/Playwright) → HTML Parser            │  │
 │  │ Output: RequirementsManagementGuide (JSON/JSONL)                   │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                              ↓                                           │
 │  Stage 2: EXTRACT & EMBED (neo4j_graphrag SimpleKGPipeline)             │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ JamaHTMLLoader → HierarchicalHTMLSplitter → LLMEntityRelExtractor │  │
+│  │ GuideHTMLLoader → HierarchicalHTMLSplitter → LLMEntityRelExtractor│  │
 │  │ - Optional Chonkie SemanticChunker (Savitzky-Golay boundaries)    │  │
 │  │ - Schema-constrained entity extraction (10 node types)             │  │
 │  │ - Voyage AI voyage-4 embeddings (auto-detected from VOYAGE_API_KEY)│  │
@@ -177,7 +177,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
    - `PlaywrightFetcher` - Headless browser for JS-rendered content (lazy init)
    - `create_fetcher()` - Factory function for instantiation
 
-3. **scraper.py** - `JamaGuideScraper` orchestrates scraping, `run_scraper()` runs full 5-stage pipeline:
+3. **scraper.py** - `GuideScraper` orchestrates scraping, `run_scraper()` runs full 5-stage pipeline:
    - `scrape_all()` → `_discover_guide_structure()` → `_scrape_all_chapters()` → `_scrape_glossary()` → `_enrich_webinar_thumbnails()`
    - Dynamic discovery from `#chapter-menu` TOC (single HTTP request replaces per-chapter discovery)
    - Uses fetcher abstraction via dependency injection
@@ -200,11 +200,11 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
    - `PATTERNS` - ~30 validation patterns for entity names
 
 8. **extraction/pipeline.py** - `neo4j_graphrag` integration:
-   - `JamaKGPipelineConfig` - Pipeline configuration dataclass
-   - `create_jama_kg_pipeline()` - Factory for SimpleKGPipeline
+   - `KGPipelineConfig` - Pipeline configuration dataclass
+   - `create_kg_pipeline()` - Factory for SimpleKGPipeline
    - `process_guide_with_pipeline()` - Main processing function
 
-9. **loaders/html_loader.py** - `JamaHTMLLoader` implements neo4j_graphrag DataLoader interface.
+9. **loaders/html_loader.py** - `GuideHTMLLoader` implements neo4j_graphrag DataLoader interface.
 
 10. **chunking/hierarchical_chunker.py** - LangChain-based hierarchical HTML splitting with optional Chonkie semantic chunking (stage 2 fallback to RCTS).
 
@@ -270,7 +270,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - **Dynamic TOC Discovery** - All chapters/articles discovered from `#chapter-menu` on the guide's main page (single HTTP request, no static fallback)
 - **OG Image Enrichment** - `_enrich_webinar_thumbnails()` runs inside `scrape_all()` after guide construction, fetches unique webinar landing pages to backfill null `thumbnail_url` via `<meta property="og:image">`
 - Uses `html.parser` (not lxml) for TOC parsing because the source HTML has `<div>` inside `<ul>` — lxml restructures this invalid nesting
-- Cloudflare blocks default httpx User-Agent — always set `User-Agent: JamaGuideScraper/0.1.0 (Educational/Research)` for direct requests
+- Cloudflare blocks default httpx User-Agent — always set `User-Agent: GuideScraper/0.1.0 (Educational/Research)` for direct requests
 - Content models (`WebinarReference`, etc.) are mutable Pydantic v2 `BaseModel` — direct attribute assignment works for post-scrape enrichment
 
 **Knowledge Graph Layer:**

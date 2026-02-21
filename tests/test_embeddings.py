@@ -112,22 +112,22 @@ class TestEmbedderAutoDetection:
         """Verify VOYAGE_API_KEY is loaded from environment."""
         monkeypatch.setenv("VOYAGE_API_KEY", "voy-test-key")
 
-        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
 
-        config = JamaKGPipelineConfig.from_env()
+        config = KGPipelineConfig.from_env()
         assert config.voyage_api_key == "voy-test-key"
 
     def test_no_voyage_key_defaults_empty(self, mock_env_vars) -> None:
         """Verify missing VOYAGE_API_KEY defaults to empty string."""
-        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
 
-        config = JamaKGPipelineConfig.from_env()
+        config = KGPipelineConfig.from_env()
         assert config.voyage_api_key == ""
 
     def test_config_has_voyage_fields(self) -> None:
         """Verify config dataclass has Voyage AI fields."""
-        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
 
-        config = JamaKGPipelineConfig()
+        config = KGPipelineConfig()
         assert config.voyage_model == "voyage-4"
         assert config.voyage_api_key == ""

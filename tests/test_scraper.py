@@ -15,7 +15,7 @@ from graphrag_kg_pipeline.models.content import (
     WebinarReference,
 )
 from graphrag_kg_pipeline.parser import HTMLParser
-from graphrag_kg_pipeline.scraper import JamaGuideScraper
+from graphrag_kg_pipeline.scraper import GuideScraper
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -281,7 +281,7 @@ def _make_guide(webinars_by_article: list[list[WebinarReference]]) -> Requiremen
 
 
 class TestEnrichWebinarThumbnails:
-    """Tests for JamaGuideScraper._enrich_webinar_thumbnails()."""
+    """Tests for GuideScraper._enrich_webinar_thumbnails()."""
 
     @pytest.mark.asyncio
     async def test_enriches_null_thumbnails(self) -> None:
@@ -290,7 +290,7 @@ class TestEnrichWebinarThumbnails:
         guide = _make_guide([[webinar]])
 
         fetcher = MockFetcher({WEBINAR_URL_A: _og_page(OG_IMAGE_A)})
-        scraper = JamaGuideScraper()
+        scraper = GuideScraper()
         await scraper._enrich_webinar_thumbnails(guide, fetcher)
 
         assert webinar.thumbnail_url == OG_IMAGE_A
@@ -303,7 +303,7 @@ class TestEnrichWebinarThumbnails:
         guide = _make_guide([[w1], [w2]])
 
         fetcher = MockFetcher({WEBINAR_URL_A: _og_page(OG_IMAGE_A)})
-        scraper = JamaGuideScraper()
+        scraper = GuideScraper()
         await scraper._enrich_webinar_thumbnails(guide, fetcher)
 
         assert w1.thumbnail_url == OG_IMAGE_A
@@ -319,7 +319,7 @@ class TestEnrichWebinarThumbnails:
         guide = _make_guide([[existing]])
 
         fetcher = MockFetcher({WEBINAR_URL_A: _og_page(OG_IMAGE_A)})
-        scraper = JamaGuideScraper()
+        scraper = GuideScraper()
         await scraper._enrich_webinar_thumbnails(guide, fetcher)
 
         assert existing.thumbnail_url == "https://existing.jpg"
@@ -332,7 +332,7 @@ class TestEnrichWebinarThumbnails:
         guide = _make_guide([[webinar]])
 
         fetcher = MockFetcher({WEBINAR_URL_B: None})
-        scraper = JamaGuideScraper()
+        scraper = GuideScraper()
         await scraper._enrich_webinar_thumbnails(guide, fetcher)
 
         assert webinar.thumbnail_url is None

@@ -1,7 +1,7 @@
-"""Custom DataLoader for Jama Guide HTML content.
+"""Custom DataLoader for requirements guide HTML content.
 
 This module implements the neo4j_graphrag DataLoader interface for
-loading and preprocessing Jama Guide articles.
+loading and preprocessing guide articles.
 """
 
 from pathlib import Path
@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
-class JamaHTMLLoader:
-    """DataLoader for Jama Guide HTML and markdown content.
+class GuideHTMLLoader:
+    """DataLoader for guide HTML and markdown content.
 
     Implements the neo4j_graphrag DataLoader pattern for loading
     article content. Supports both file-based loading and direct
@@ -29,7 +29,7 @@ class JamaHTMLLoader:
 
     Example:
         >>> index = build_article_index(guide)
-        >>> loader = JamaHTMLLoader(article_index=index)
+        >>> loader = GuideHTMLLoader(article_index=index)
         >>> doc = await loader.run("ch1-art3")
         >>> print(doc.text[:100])
     """

@@ -21,7 +21,7 @@ A Python ETL pipeline that scrapes Jama Software's **"The Essential Guide to Req
 
 ```
                    ┌──────────────────────────────────────────────┐
-                   │              JamaGuideScraper                │
+                   │              GuideScraper                    │
                    │  - Async HTTP fetching (httpx)               │
                    │  - HTML → Markdown conversion                │
                    │  - Cross-reference extraction                │
@@ -32,7 +32,7 @@ A Python ETL pipeline that scrapes Jama Software's **"The Essential Guide to Req
 │                          neo4j_graphrag Pipeline                             │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐    ┌─────────────────┐    ┌───────────────────────┐    │
-│  │ JamaHTMLLoader  │───▶│ HTMLSplitter    │───▶│ LLMEntityRelExtractor │    │
+│  │ GuideHTMLLoader │───▶│ HTMLSplitter    │───▶│ LLMEntityRelExtractor │    │
 │  │ (DataLoader)    │    │ (LangChain)     │    │ (Schema-constrained)  │    │
 │  └─────────────────┘    └─────────────────┘    └───────────────────────┘    │
 │                                                            │                 │
@@ -253,7 +253,7 @@ graphrag-kg-pipeline/
 │   │   ├── prompts.py        # LLM extraction prompts
 │   │   └── pipeline.py       # SimpleKGPipeline factory
 │   ├── loaders/              # Data loading
-│   │   ├── html_loader.py    # JamaHTMLLoader
+│   │   ├── html_loader.py    # GuideHTMLLoader
 │   │   └── index_builder.py  # Article index utilities
 │   ├── postprocessing/       # Entity normalization
 │   │   ├── industry_taxonomy.py  # 18 canonical industries
@@ -356,7 +356,7 @@ The script demonstrates four query approaches:
 
 Example output:
 ```
-╭────────────────────── Jama Guide Knowledge Graph Test ───────────────────────╮
+╭────────────────────── Guide Knowledge Graph Test ────────────────────────────╮
 │ Query: What can you tell me about Requirements Tracing?                      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 

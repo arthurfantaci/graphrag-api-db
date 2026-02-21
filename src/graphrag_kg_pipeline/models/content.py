@@ -1,4 +1,4 @@
-"""Pydantic models for Jama Requirements Management Guide content.
+"""Pydantic models for Requirements Management Guide content.
 
 Designed for:
 - LLM/Agent consumption

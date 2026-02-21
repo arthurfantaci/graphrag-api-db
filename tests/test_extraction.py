@@ -215,9 +215,9 @@ class TestPipelineConfig:
 
     def test_config_from_env(self, mock_env_vars: dict[str, str]) -> None:
         """Test creating config from environment variables."""
-        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
 
-        config = JamaKGPipelineConfig.from_env()
+        config = KGPipelineConfig.from_env()
 
         assert config.neo4j_uri == mock_env_vars["NEO4J_URI"]
         assert config.neo4j_username == mock_env_vars["NEO4J_USERNAME"]
@@ -226,9 +226,9 @@ class TestPipelineConfig:
 
     def test_config_default_models(self, mock_env_vars: dict[str, str]) -> None:
         """Test that config has sensible default model names."""
-        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
 
-        config = JamaKGPipelineConfig.from_env()
+        config = KGPipelineConfig.from_env()
 
         # Should have reasonable defaults
         assert "gpt" in config.llm_model.lower() or config.llm_model
@@ -237,9 +237,9 @@ class TestPipelineConfig:
     def test_config_has_chunking_config(self, mock_env_vars: dict[str, str]) -> None:
         """Test that pipeline config includes chunking config."""
         from graphrag_kg_pipeline.chunking.config import HierarchicalChunkingConfig
-        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
 
-        config = JamaKGPipelineConfig.from_env()
+        config = KGPipelineConfig.from_env()
 
         assert hasattr(config, "chunking_config")
         assert isinstance(config.chunking_config, HierarchicalChunkingConfig)
@@ -248,7 +248,7 @@ class TestPipelineConfig:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test behavior when env vars are missing."""
-        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
 
         # Clear all Neo4j env vars
         monkeypatch.delenv("NEO4J_URI", raising=False)
@@ -258,7 +258,7 @@ class TestPipelineConfig:
 
         # Should either raise or use defaults
         try:
-            config = JamaKGPipelineConfig.from_env()
+            config = KGPipelineConfig.from_env()
             # If it doesn't raise, it should have some defaults or empty strings
             assert config is not None
         except (ValueError, KeyError):
@@ -381,9 +381,9 @@ class TestPipelineConfigGleaningSettings:
 
     def test_default_gleaning_enabled(self) -> None:
         """Test that gleaning is enabled by default."""
-        from graphrag_kg_pipeline.extraction.pipeline import JamaKGPipelineConfig
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
 
-        config = JamaKGPipelineConfig()
+        config = KGPipelineConfig()
         assert config.enable_gleaning is True
         assert config.gleaning_passes == 2
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate dynamic TOC discovery against the live Jama guide website.
+"""Validate dynamic TOC discovery against the live requirements guide website.
 
 Fetches the guide's main page, parses ``div#chapter-menu``, and prints
 the discovered chapter/article structure. Use this as a quick sanity
@@ -38,7 +38,7 @@ def main() -> int:
     """Fetch the guide page and validate TOC discovery."""
     console.print(f"\n[bold]Fetching guide page:[/] {BASE_URL}")
 
-    headers = {"User-Agent": "JamaGuideScraper/0.1.0 (Educational/Research)"}
+    headers = {"User-Agent": "GuideScraper/0.1.0 (Educational/Research)"}
     try:
         response = httpx.get(BASE_URL, headers=headers, follow_redirects=True, timeout=30.0)
         response.raise_for_status()
