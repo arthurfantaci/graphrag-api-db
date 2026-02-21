@@ -8,6 +8,7 @@ This package provides:
 from graphrag_kg_pipeline.graph.constraints import (
     ConstraintManager,
     create_all_constraints,
+    create_community_vector_index,
     create_vector_index,
 )
 from graphrag_kg_pipeline.graph.supplementary import (
@@ -28,5 +29,6 @@ __all__ = [
     # Constraints
     "ConstraintManager",
     "create_all_constraints",
+    "create_community_vector_index",
     "create_vector_index",
 ]

@@ -3,7 +3,7 @@
 This CLI provides two main commands:
 
 1. `graphrag-kg` (default): Run the complete Neo4j GraphRAG pipeline
-   - Scrape all articles and glossary from Jama's guide
+   - Scrape all articles and glossary from the guide
    - Process through neo4j_graphrag SimpleKGPipeline
    - Apply post-processing (entity normalization, industry consolidation)
    - Create supplementary graph structure (chapters, resources)
@@ -48,7 +48,7 @@ def _create_scrape_parser(subparsers: argparse._SubParsersAction) -> None:
         description="""
 Run the complete neo4j_graphrag pipeline:
 
-  1. Scrape all 103 articles + glossary from Jama's guide
+  1. Scrape all 103 articles + glossary from the guide
   2. Process through SimpleKGPipeline (chunking, extraction, embeddings)
   3. Apply entity normalization and industry consolidation
   4. Create supplementary structure (chapters, resources, glossary)
@@ -286,7 +286,7 @@ def _run_scrape_command(args: argparse.Namespace) -> None:
     Args:
         args: Parsed command-line arguments.
     """
-    console.print("[bold cyan]Jama Guide → Neo4j GraphRAG Pipeline[/]")
+    console.print("[bold cyan]Requirements Guide → Neo4j GraphRAG Pipeline[/]")
     console.print(f"Output directory: {args.output}")
     console.print()
 
@@ -357,7 +357,7 @@ def _run_scrape_command(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    """Run the Jama Guide Scraper CLI.
+    """Run the Guide Scraper CLI.
 
     Provides subcommands for scraping and validation.
     """
@@ -366,7 +366,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="graphrag-kg",
-        description="Scrape Jama's Requirements Guide into Neo4j graph",
+        description="Scrape Requirements Guide into Neo4j graph",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Commands:

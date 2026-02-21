@@ -1,4 +1,4 @@
-"""LangChain-based chunking for the Jama Guide ETL pipeline.
+"""LangChain-based chunking for the guide ETL pipeline.
 
 This package provides hierarchical HTML chunking using LangChain's
 HTMLHeaderTextSplitter with fallback to RecursiveCharacterTextSplitter

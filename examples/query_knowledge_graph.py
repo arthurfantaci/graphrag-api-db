@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Query the Jama Guide knowledge graph with four retrieval strategies.
+"""Query the requirements guide knowledge graph with four retrieval strategies.
 
 Demonstrates four approaches to querying a Neo4j knowledge graph built by
 the graphrag-kg pipeline:
@@ -294,7 +294,7 @@ def parse_args() -> argparse.Namespace:
         Parsed arguments with query and search_term attributes.
     """
     parser = argparse.ArgumentParser(
-        description="Query the Jama Guide knowledge graph",
+        description="Query the requirements guide knowledge graph",
     )
     parser.add_argument(
         "query",
@@ -314,7 +314,8 @@ def main() -> None:
     """Run the knowledge graph query demonstration."""
     args = parse_args()
 
-    console.print(Panel(f"[bold cyan]Query:[/] {args.query}", title="Jama Guide Knowledge Graph"))
+    panel_title = "Requirements Guide Knowledge Graph"
+    console.print(Panel(f"[bold cyan]Query:[/] {args.query}", title=panel_title))
 
     driver = get_driver()
     try:

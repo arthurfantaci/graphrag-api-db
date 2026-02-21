@@ -142,21 +142,21 @@ class TestBuildArticleIndex:
         assert "markdown_content" not in index_without.by_id["ch1-art1"]
 
 
-class TestJamaHTMLLoader:
-    """Tests for the JamaHTMLLoader class."""
+class TestGuideHTMLLoader:
+    """Tests for the GuideHTMLLoader class."""
 
     def test_loader_initialization(self) -> None:
         """Test that loader initializes correctly."""
-        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import GuideHTMLLoader
 
-        loader = JamaHTMLLoader()
+        loader = GuideHTMLLoader()
         assert loader is not None
         assert loader.article_index == {}
         assert loader.preprocess_html is True
 
     def test_loader_with_article_index(self) -> None:
         """Test loader initialization with article index."""
-        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import GuideHTMLLoader
 
         index = {
             "ch1-art1": {
@@ -166,22 +166,22 @@ class TestJamaHTMLLoader:
             }
         }
 
-        loader = JamaHTMLLoader(article_index=index)
+        loader = GuideHTMLLoader(article_index=index)
 
         assert loader.article_index == index
         assert "ch1-art1" in loader.article_index
 
     def test_loader_preprocess_flag(self) -> None:
         """Test loader with preprocess flag disabled."""
-        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import GuideHTMLLoader
 
-        loader = JamaHTMLLoader(preprocess_html=False)
+        loader = GuideHTMLLoader(preprocess_html=False)
         assert loader.preprocess_html is False
 
     @pytest.mark.asyncio
     async def test_loader_run_with_article_id(self) -> None:
         """Test loading article by ID from index."""
-        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import GuideHTMLLoader
 
         index = {
             "ch1-art1": {
@@ -192,7 +192,7 @@ class TestJamaHTMLLoader:
             }
         }
 
-        loader = JamaHTMLLoader(article_index=index)
+        loader = GuideHTMLLoader(article_index=index)
         result = await loader.run("ch1-art1")
 
         assert result is not None
@@ -203,7 +203,7 @@ class TestJamaHTMLLoader:
     @pytest.mark.asyncio
     async def test_loader_returns_metadata(self) -> None:
         """Test that loader returns document with metadata via document_info."""
-        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import GuideHTMLLoader
 
         index = {
             "ch1-art1": {
@@ -214,7 +214,7 @@ class TestJamaHTMLLoader:
             }
         }
 
-        loader = JamaHTMLLoader(article_index=index)
+        loader = GuideHTMLLoader(article_index=index)
         result = await loader.run("ch1-art1")
 
         # Should have document_info with metadata about the article
@@ -226,9 +226,9 @@ class TestJamaHTMLLoader:
     @pytest.mark.asyncio
     async def test_loader_missing_article_raises(self) -> None:
         """Test that missing article raises error."""
-        from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
+        from graphrag_kg_pipeline.loaders.html_loader import GuideHTMLLoader
 
-        loader = JamaHTMLLoader(article_index={})
+        loader = GuideHTMLLoader(article_index={})
 
         with pytest.raises((ValueError, KeyError)):
             await loader.run("nonexistent-article")

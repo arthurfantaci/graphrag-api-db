@@ -1,4 +1,4 @@
-"""Pydantic models for the Jama Guide ETL pipeline.
+"""Pydantic models for the guide ETL pipeline.
 
 This package contains:
 - Core content models (article, chapter, glossary)

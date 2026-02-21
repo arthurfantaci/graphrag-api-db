@@ -242,10 +242,13 @@ class ExtractionGleaner:
             if node.get("definition"):
                 props["definition"] = node["definition"]
 
-            # MERGE entity and MENTIONED_IN relationship
+            # MERGE entity with __Entity__ + __KGBuilder__ labels (matching
+            # neo4j_graphrag's label stack) and MENTIONED_IN relationship.
+            # Without __Entity__, gleaned nodes are invisible to entity
+            # resolution, cross-label dedup, and downstream queries.
             query = f"""
-            MERGE (e:{label} {{name: $name}})
-            ON CREATE SET e += $props
+            MERGE (e:__Entity__:{label} {{name: $name}})
+            ON CREATE SET e += $props, e:__KGBuilder__
             WITH e
             MATCH (c) WHERE elementId(c) = $chunk_id
             MERGE (e)-[:MENTIONED_IN]->(c)

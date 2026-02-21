@@ -1,4 +1,4 @@
-"""Configuration and URL mappings for the Jama Requirements Management Guide.
+"""Configuration and URL mappings for the Requirements Management Guide.
 
 All URLs extracted from the guide's table of contents.
 """

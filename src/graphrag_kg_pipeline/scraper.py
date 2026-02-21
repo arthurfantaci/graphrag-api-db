@@ -1,4 +1,4 @@
-"""Async web scraper for the Jama Requirements Management Guide.
+"""Async web scraper for the Requirements Management Guide.
 
 Features:
 - Pluggable fetcher abstraction (httpx or Playwright)
@@ -48,21 +48,21 @@ if TYPE_CHECKING:
 console = Console()
 
 
-class JamaGuideScraper:
-    """Scraper for the Jama Requirements Management Guide.
+class GuideScraper:
+    """Scraper for the Requirements Management Guide.
 
     Supports two fetching modes:
     - Default (httpx): Fast, lightweight, for static HTML content
     - Browser (Playwright): Slower but renders JavaScript for dynamic content
 
     Usage:
-        scraper = JamaGuideScraper()
+        scraper = GuideScraper()
         guide = await scraper.scrape_all()
         scraper.save_json(guide, Path("output/guide.json"))
         scraper.save_jsonl(guide, Path("output/guide.jsonl"))
 
         # For JavaScript-rendered content (e.g., YouTube embeds):
-        scraper = JamaGuideScraper(use_browser=True)
+        scraper = GuideScraper(use_browser=True)
         guide = await scraper.scrape_all()
     """
 
@@ -94,7 +94,7 @@ class JamaGuideScraper:
 
     async def scrape_all(self) -> RequirementsManagementGuide:
         """Scrape the entire guide including all chapters and glossary."""
-        console.print("[bold blue]Starting Jama Requirements Management Guide Scraper[/]")
+        console.print("[bold blue]Starting Requirements Management Guide Scraper[/]")
         mode = "browser (Playwright)" if self._use_browser else "httpx"
         console.print(
             f"Rate limit: {self._config.rate_limit_delay}s delay, "
@@ -497,7 +497,7 @@ async def run_scraper(
     Returns:
         The scraped guide data.
     """
-    scraper = JamaGuideScraper(
+    scraper = GuideScraper(
         include_raw_html=False,
         use_browser=use_browser,
     )
@@ -552,12 +552,12 @@ async def _run_preflight(_output_dir: Path) -> None:
     Raises:
         PreflightError: If any critical check fails.
     """
-    from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
+    from .extraction.pipeline import KGPipelineConfig, create_async_neo4j_driver
     from .preflight import PreflightError, run_preflight_checks
 
     console.print("\n[bold cyan]Running pre-flight checks...[/]")
 
-    config = JamaKGPipelineConfig.from_env()
+    config = KGPipelineConfig.from_env()
     driver = create_async_neo4j_driver(config)
 
     try:
@@ -613,14 +613,14 @@ async def _run_neo4j_graphrag_pipeline(
         Processing statistics.
     """
     from .extraction.pipeline import (
-        JamaKGPipelineConfig,
+        KGPipelineConfig,
         process_guide_with_pipeline,
     )
 
     console.print("\n[bold cyan]Starting neo4j_graphrag pipeline...[/]")
 
     # Load configuration from environment
-    config = JamaKGPipelineConfig.from_env()
+    config = KGPipelineConfig.from_env()
 
     console.print(f"  LLM model: {config.llm_model}")
     console.print(f"  Embedding model: {config.embedding_model}")
@@ -640,13 +640,13 @@ async def _run_post_processing(_output_dir: Path) -> None:
     Args:
         _output_dir: Directory for output files (reserved for future use).
     """
-    from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
+    from .extraction.pipeline import KGPipelineConfig, create_async_neo4j_driver
     from .postprocessing.industry_taxonomy import IndustryNormalizer
     from .postprocessing.normalizer import EntityNormalizer
 
     console.print("\n[bold cyan]Running post-processing...[/]")
 
-    config = JamaKGPipelineConfig.from_env()
+    config = KGPipelineConfig.from_env()
     driver = create_async_neo4j_driver(config)
 
     try:
@@ -758,6 +758,20 @@ async def _run_post_processing(_output_dir: Path) -> None:
                 summ_stats = await summarizer.summarize_communities()
                 console.print(f"    Summarized {summ_stats['communities_summarized']} communities")
 
+            # Community summary embeddings (optional — requires Voyage AI)
+            if config.voyage_api_key:
+                from .graph.community_embedder import CommunityEmbedder
+
+                console.print("  Embedding community summaries (Voyage AI)...")
+                embedder = CommunityEmbedder(
+                    driver=driver,
+                    database=config.neo4j_database,
+                    model=config.voyage_model,
+                    dimensions=config.embedding_dimensions,
+                )
+                embed_stats = await embedder.embed_community_summaries()
+                console.print(f"    Embedded {embed_stats['embedded']} community summaries")
+
         except ImportError:
             pass  # leidenalg/igraph not installed — skip community detection
 
@@ -777,9 +791,10 @@ async def _build_supplementary_structure(
         _output_dir: Directory for output files (reserved for future use).
         skip_resources: If True, skip resource nodes.
     """
-    from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
+    from .extraction.pipeline import KGPipelineConfig, create_async_neo4j_driver
     from .graph.constraints import (
         create_all_constraints,
+        create_community_vector_index,
         create_fulltext_index,
         create_vector_index,
     )
@@ -787,7 +802,7 @@ async def _build_supplementary_structure(
 
     console.print("\n[bold cyan]Building supplementary graph structure...[/]")
 
-    config = JamaKGPipelineConfig.from_env()
+    config = KGPipelineConfig.from_env()
     driver = create_async_neo4j_driver(config)
 
     try:
@@ -795,6 +810,11 @@ async def _build_supplementary_structure(
         console.print("  Creating constraints and indexes...")
         await create_all_constraints(driver, config.neo4j_database)
         await create_vector_index(
+            driver,
+            config.neo4j_database,
+            dimensions=config.embedding_dimensions,
+        )
+        await create_community_vector_index(
             driver,
             config.neo4j_database,
             dimensions=config.embedding_dimensions,
@@ -835,12 +855,12 @@ async def _run_validation(output_dir: Path) -> None:
     Args:
         output_dir: Directory for output files.
     """
-    from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
+    from .extraction.pipeline import KGPipelineConfig, create_async_neo4j_driver
     from .validation.reporter import generate_validation_report
 
     console.print("\n[bold cyan]Running validation...[/]")
 
-    config = JamaKGPipelineConfig.from_env()
+    config = KGPipelineConfig.from_env()
     driver = create_async_neo4j_driver(config)
 
     try:

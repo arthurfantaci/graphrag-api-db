@@ -1,4 +1,4 @@
-"""HTML parsing utilities for extracting and converting Jama guide content.
+"""HTML parsing utilities for extracting and converting guide content.
 
 Converts HTML to clean Markdown and extracts metadata for RAG/knowledge graph use.
 """
@@ -76,7 +76,7 @@ PROMO_TEXT_PATTERNS = re.compile(
 
 
 class HTMLParser:
-    """Parser for Jama guide HTML content."""
+    """Parser for requirements guide HTML content."""
 
     def __init__(self, base_url: str = BASE_URL) -> None:
         """Initialize the parser with the base URL for resolving relative links."""
@@ -423,7 +423,7 @@ class HTMLParser:
         Targets the flex_cell_inner div which contains article content,
         selectively excluding final sections that contain CTA content.
         """
-        # Jama's site uses Enfold/Avia theme with flex_cell layout
+        # Site uses Enfold/Avia theme with flex_cell layout
         # The second flex_cell_inner contains the main article content
         flex_cell_inners = soup.select(".flex_cell_inner")
         if len(flex_cell_inners) >= MIN_CONTENT_ELEMENTS:
@@ -860,7 +860,7 @@ class HTMLParser:
     def _extract_webinars(self, elem: Tag, source_url: str) -> list[WebinarReference]:
         """Extract webinar links from the content.
 
-        Identifies links to Jama's webinar resources including:
+        Identifies links to webinar resources including:
         - Featured webinar sections with "In This Webinar" descriptions
         - Image thumbnails linking to webinars
         - Text links to webinars

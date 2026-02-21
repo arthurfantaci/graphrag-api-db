@@ -1,18 +1,18 @@
-"""Custom data loaders for the Jama Guide ETL pipeline.
+"""Custom data loaders for the guide ETL pipeline.
 
 This package provides:
-- JamaHTMLLoader: DataLoader for processing HTML/markdown content
+- GuideHTMLLoader: DataLoader for processing HTML/markdown content
 - Article index building utilities
 """
 
-from graphrag_kg_pipeline.loaders.html_loader import JamaHTMLLoader
+from graphrag_kg_pipeline.loaders.html_loader import GuideHTMLLoader
 from graphrag_kg_pipeline.loaders.index_builder import (
     ArticleIndex,
     build_article_index,
 )
 
 __all__ = [
-    "JamaHTMLLoader",
+    "GuideHTMLLoader",
     "ArticleIndex",
     "build_article_index",
 ]

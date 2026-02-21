@@ -1,11 +1,11 @@
-"""Jama Requirements Management Guide Scraper.
+"""Requirements Management Guide Scraper.
 
-A tool to scrape and consolidate Jama Software's "Essential Guide to
+A tool to scrape and consolidate the "Essential Guide to
 Requirements Management and Traceability" into a Neo4j knowledge graph
 using neo4j_graphrag's SimpleKGPipeline.
 
 Usage:
-    from graphrag_kg_pipeline import JamaGuideScraper, run_scraper
+    from graphrag_kg_pipeline import GuideScraper, run_scraper
     import asyncio
 
     # Quick run (scrape + Neo4j pipeline)
@@ -15,11 +15,11 @@ Usage:
     guide = asyncio.run(run_scraper(scrape_only=True))
 
     # Or with more control
-    scraper = JamaGuideScraper()
+    scraper = GuideScraper()
     guide = asyncio.run(scraper.scrape_all())
 
     # For JavaScript-rendered content (e.g., YouTube embeds):
-    scraper = JamaGuideScraper(use_browser=True)
+    scraper = GuideScraper(use_browser=True)
     guide = asyncio.run(scraper.scrape_all())
 
     # Full pipeline with validation:
@@ -52,9 +52,9 @@ from .extraction import (
     NODE_TYPES,
     PATTERNS,
     RELATIONSHIP_TYPES,
-    JamaKGPipelineConfig,
+    KGPipelineConfig,
     create_extraction_template,
-    create_jama_kg_pipeline,
+    create_kg_pipeline,
     get_schema_for_pipeline,
     process_guide_with_pipeline,
 )
@@ -85,7 +85,7 @@ from .graph import (
 # Loaders
 from .loaders import (
     ArticleIndex,
-    JamaHTMLLoader,
+    GuideHTMLLoader,
     build_article_index,
 )
 from .models.content import (
@@ -139,7 +139,7 @@ from .preflight import PreflightError
 # =============================================================================
 # SCRAPER (always available)
 # =============================================================================
-from .scraper import JamaGuideScraper, run_scraper
+from .scraper import GuideScraper, run_scraper
 
 # Validation
 from .validation import (
@@ -172,7 +172,7 @@ __all__ = [
     # ==========================================================================
     # SCRAPER
     # ==========================================================================
-    "JamaGuideScraper",
+    "GuideScraper",
     "run_scraper",
     # ==========================================================================
     # FETCHERS
@@ -198,16 +198,16 @@ __all__ = [
     "HierarchicalHTMLSplitter",
     "create_text_splitter_adapter",
     # Extraction
-    "JamaKGPipelineConfig",
+    "KGPipelineConfig",
     "NODE_TYPES",
     "RELATIONSHIP_TYPES",
     "PATTERNS",
     "get_schema_for_pipeline",
     "create_extraction_template",
-    "create_jama_kg_pipeline",
+    "create_kg_pipeline",
     "process_guide_with_pipeline",
     # Loaders
-    "JamaHTMLLoader",
+    "GuideHTMLLoader",
     "ArticleIndex",
     "build_article_index",
     # Post-processing

@@ -1,4 +1,4 @@
-"""Article index builder for the Jama Guide ETL pipeline.
+"""Article index builder for the guide ETL pipeline.
 
 This module provides utilities for building an article index that
 maps article IDs to their metadata, enabling efficient lookup

@@ -65,7 +65,7 @@ class FetcherConfig:
     max_concurrent: int = MAX_CONCURRENT_REQUESTS
     timeout: float = REQUEST_TIMEOUT_SECONDS
     max_retries: int = MAX_RETRIES
-    user_agent: str = "JamaGuideScraper/0.1.0 (Educational/Research)"
+    user_agent: str = "GuideScraper/0.1.0 (Educational/Research)"
 
 
 @runtime_checkable

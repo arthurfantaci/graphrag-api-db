@@ -102,13 +102,13 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 │                                                                          │
 │  Stage 1: SCRAPE                                                         │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ JamaGuideScraper → Fetcher (httpx/Playwright) → HTML Parser       │  │
+│  │ GuideScraper → Fetcher (httpx/Playwright) → HTML Parser            │  │
 │  │ Output: RequirementsManagementGuide (JSON/JSONL)                   │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                              ↓                                           │
 │  Stage 2: EXTRACT & EMBED (neo4j_graphrag SimpleKGPipeline)             │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ JamaHTMLLoader → HierarchicalHTMLSplitter → LLMEntityRelExtractor │  │
+│  │ GuideHTMLLoader → HierarchicalHTMLSplitter → LLMEntityRelExtractor│  │
 │  │ - Optional Chonkie SemanticChunker (Savitzky-Golay boundaries)    │  │
 │  │ - Schema-constrained entity extraction (10 node types)             │  │
 │  │ - Voyage AI voyage-4 embeddings (auto-detected from VOYAGE_API_KEY)│  │
@@ -126,6 +126,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 │  │ 7. LangExtractAugmenter.augment() — source grounding (optional) │  │
 │  │ 8. CommunityDetector.detect_communities() — Leiden clustering   │  │
 │  │ 9. CommunitySummarizer.summarize_communities() — LLM summaries  │  │
+│  │ 10. CommunityEmbedder.embed_community_summaries() — vectors   │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                              ↓                                           │
 │  Stage 4: SUPPLEMENT (Graph Structure)                                   │
@@ -177,7 +178,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
    - `PlaywrightFetcher` - Headless browser for JS-rendered content (lazy init)
    - `create_fetcher()` - Factory function for instantiation
 
-3. **scraper.py** - `JamaGuideScraper` orchestrates scraping, `run_scraper()` runs full 5-stage pipeline:
+3. **scraper.py** - `GuideScraper` orchestrates scraping, `run_scraper()` runs full 5-stage pipeline:
    - `scrape_all()` → `_discover_guide_structure()` → `_scrape_all_chapters()` → `_scrape_glossary()` → `_enrich_webinar_thumbnails()`
    - Dynamic discovery from `#chapter-menu` TOC (single HTTP request replaces per-chapter discovery)
    - Uses fetcher abstraction via dependency injection
@@ -200,11 +201,11 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
    - `PATTERNS` - ~30 validation patterns for entity names
 
 8. **extraction/pipeline.py** - `neo4j_graphrag` integration:
-   - `JamaKGPipelineConfig` - Pipeline configuration dataclass
-   - `create_jama_kg_pipeline()` - Factory for SimpleKGPipeline
+   - `KGPipelineConfig` - Pipeline configuration dataclass
+   - `create_kg_pipeline()` - Factory for SimpleKGPipeline
    - `process_guide_with_pipeline()` - Main processing function
 
-9. **loaders/html_loader.py** - `JamaHTMLLoader` implements neo4j_graphrag DataLoader interface.
+9. **loaders/html_loader.py** - `GuideHTMLLoader` implements neo4j_graphrag DataLoader interface.
 
 10. **chunking/hierarchical_chunker.py** - LangChain-based hierarchical HTML splitting with optional Chonkie semantic chunking (stage 2 fallback to RCTS).
 
@@ -224,30 +225,33 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 
 16. **postprocessing/langextract_augmenter.py** - `LangExtractAugmenter`: post-extraction entity augmentation with source grounding (text span provenance).
 
-**Graph Algorithms (Stage 3, steps 8-9):**
+**Graph Algorithms (Stage 3, steps 8-10):**
 
 17. **graph/community_detection.py** - `CommunityDetector`: Leiden community detection using `leidenalg` + `igraph` on semantic edges only.
 
 18. **graph/community_summarizer.py** - `CommunitySummarizer`: LLM-generated community summaries (gpt-4o-mini), creates Community nodes linked via IN_COMMUNITY.
 
+19. **graph/community_embedder.py** - `CommunityEmbedder`: Voyage AI voyage-4 embeddings for Community node summaries, enables vector search over communities.
+
 **Graph Building (Stage 4):**
 
-19. **graph/supplementary.py** - `SupplementaryGraphBuilder`:
+20. **graph/supplementary.py** - `SupplementaryGraphBuilder`:
     - Chapter structure, Resource nodes, Glossary-to-concept linking
 
-20. **graph/constraints.py** - `ConstraintManager` for Neo4j indexes and constraints.
+21. **graph/constraints.py** - `ConstraintManager` for Neo4j indexes and constraints. Also provides `create_community_vector_index()` for `community_summary_embeddings` vector index (1024d cosine).
 
 **Validation (Stage 5):**
 
-21. **validation/queries.py** - `ValidationQueries` class with Cypher checks.
+22. **validation/queries.py** - `ValidationQueries` class with Cypher checks.
 
-22. **validation/fixes.py** - `ValidationFixer` for data repair operations.
+23. **validation/fixes.py** - `ValidationFixer` for data repair operations.
 
-23. **validation/reporter.py** - `ValidationReporter` for report generation.
+24. **validation/reporter.py** - `ValidationReporter` for report generation.
 
 ## Key Design Decisions
 
 **Neo4j Constraint Compatibility:**
+- `ExtractionGleaner._merge_gleaned_results()` MERGE pattern must include `__Entity__` label and set `__KGBuilder__` on creation — without these, gleaned entities are invisible to entity resolver and dedup
 - neo4j_graphrag 1.13.0+ uses `CREATE` + `apoc.create.addLabels()`, NOT `MERGE` for entities
 - Entity-type uniqueness constraints (Concept.name, Challenge.name, etc.) MUST NOT exist — they cause silent batch rollbacks via IndexEntryConflictException
 - Only structural constraints are safe: Article, Chunk, Chapter, Image, Video, Webinar, Definition
@@ -270,7 +274,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - **Dynamic TOC Discovery** - All chapters/articles discovered from `#chapter-menu` on the guide's main page (single HTTP request, no static fallback)
 - **OG Image Enrichment** - `_enrich_webinar_thumbnails()` runs inside `scrape_all()` after guide construction, fetches unique webinar landing pages to backfill null `thumbnail_url` via `<meta property="og:image">`
 - Uses `html.parser` (not lxml) for TOC parsing because the source HTML has `<div>` inside `<ul>` — lxml restructures this invalid nesting
-- Cloudflare blocks default httpx User-Agent — always set `User-Agent: JamaGuideScraper/0.1.0 (Educational/Research)` for direct requests
+- Cloudflare blocks default httpx User-Agent — always set `User-Agent: GuideScraper/0.1.0 (Educational/Research)` for direct requests
 - Content models (`WebinarReference`, etc.) are mutable Pydantic v2 `BaseModel` — direct attribute assignment works for post-scrape enrichment
 
 **Knowledge Graph Layer:**

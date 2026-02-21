@@ -1,6 +1,6 @@
 """Pytest configuration and shared test fixtures.
 
-This module provides fixtures for testing the Jama Guide Scraper,
+This module provides fixtures for testing the Guide Scraper,
 including sample HTML content, mock data, and Neo4j test utilities.
 """
 
@@ -17,7 +17,7 @@ import pytest
 
 @pytest.fixture
 def sample_article_html() -> str:
-    """Provide sample HTML content matching Jama's article pages.
+    """Provide sample HTML content matching guide article pages.
 
     Returns:
         A minimal HTML structure for parser testing.
@@ -78,7 +78,7 @@ def sample_article_html_with_headers() -> str:
 
 @pytest.fixture
 def sample_glossary_html() -> str:
-    """Provide sample HTML content matching Jama's glossary page.
+    """Provide sample HTML content matching the guide glossary page.
 
     Returns:
         A minimal HTML structure for glossary parser testing.
