@@ -661,6 +661,13 @@ async def _run_post_processing(_output_dir: Path) -> None:
         dedup_stats = await normalizer.deduplicate_by_name()
         console.print(f"    Merged {dedup_stats['merged']} duplicates")
 
+        # Cross-label deduplication (same name, different type labels)
+        console.print("  Deduplicating cross-label entities...")
+        cross_dedup_stats = await normalizer.deduplicate_cross_label()
+        console.print(
+            f"    Merged {cross_dedup_stats['cross_label_merged']} cross-label duplicates"
+        )
+
         # Entity cleanup (generic terms + plural merging)
         console.print("  Cleaning up generic and plural entities...")
         from .postprocessing.entity_cleanup import EntityCleanupNormalizer
