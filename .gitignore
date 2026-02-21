@@ -83,4 +83,6 @@ logs/
 test_output/
 
 # Local documentation (research notes, internal analysis)
-docs/
+docs/*
+!docs/architecture.drawio
+!docs/architecture.svg
