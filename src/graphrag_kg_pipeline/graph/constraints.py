@@ -325,6 +325,45 @@ async def create_vector_index(
     )
 
 
+async def create_community_vector_index(
+    driver: "Driver",
+    database: str = "neo4j",
+    index_name: str = "community_summary_embeddings",
+    dimensions: int = 1024,
+    similarity_function: str = "cosine",
+) -> None:
+    """Create vector index for community summary embeddings.
+
+    Args:
+        driver: Neo4j driver.
+        database: Database name.
+        index_name: Name for the vector index.
+        dimensions: Embedding dimensions (Voyage AI voyage-4 = 1024).
+        similarity_function: Similarity function (cosine, euclidean).
+    """
+    query = f"""
+    CREATE VECTOR INDEX {index_name} IF NOT EXISTS
+    FOR (c:Community)
+    ON c.summary_embedding
+    OPTIONS {{
+        indexConfig: {{
+            `vector.dimensions`: {dimensions},
+            `vector.similarity_function`: '{similarity_function}'
+        }}
+    }}
+    """
+
+    async with driver.session(database=database) as session:
+        await session.run(query)
+
+    logger.info(
+        "Created community vector index",
+        index_name=index_name,
+        dimensions=dimensions,
+        similarity=similarity_function,
+    )
+
+
 async def drop_all_constraints(
     driver: "Driver",
     database: str = "neo4j",
