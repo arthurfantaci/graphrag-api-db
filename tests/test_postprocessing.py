@@ -220,6 +220,97 @@ class TestEntityNormalizer:
         assert normalizer.driver == driver
 
 
+class TestCrossLabelDeduplication:
+    """Tests for cross-label entity deduplication."""
+
+    def test_label_priority_ranking_defined(self) -> None:
+        """Test that LABEL_PRIORITY constant exists and has all 10 labels."""
+        from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
+
+        assert hasattr(EntityNormalizer, "LABEL_PRIORITY")
+        assert len(EntityNormalizer.LABEL_PRIORITY) == 10
+
+    def test_label_priority_covers_entity_labels(self) -> None:
+        """Test that LABEL_PRIORITY covers the same labels as entity_labels."""
+        from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
+        from tests.conftest import MockDriver
+
+        normalizer = EntityNormalizer(MockDriver())
+        assert set(EntityNormalizer.LABEL_PRIORITY) == set(normalizer.entity_labels)
+
+    def test_resolve_winning_label_intrinsic_wins(self) -> None:
+        """Test that intrinsic types (Standard) beat generic types (Concept)."""
+        from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
+        from tests.conftest import MockDriver
+
+        normalizer = EntityNormalizer(MockDriver())
+        result = normalizer._resolve_winning_label(
+            [
+                ["__Entity__", "__KGBuilder__", "Standard"],
+                ["__Entity__", "__KGBuilder__", "Concept"],
+            ]
+        )
+        assert result == "Standard"
+
+    def test_resolve_winning_label_concept_beats_contextual(self) -> None:
+        """Test that Concept beats contextual types like Challenge."""
+        from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
+        from tests.conftest import MockDriver
+
+        normalizer = EntityNormalizer(MockDriver())
+        result = normalizer._resolve_winning_label(
+            [
+                ["__Entity__", "__KGBuilder__", "Challenge"],
+                ["__Entity__", "__KGBuilder__", "Concept"],
+            ]
+        )
+        assert result == "Concept"
+
+    def test_resolve_winning_label_no_type_labels_defaults_concept(self) -> None:
+        """Test that nodes with only system labels default to Concept."""
+        from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
+        from tests.conftest import MockDriver
+
+        normalizer = EntityNormalizer(MockDriver())
+        result = normalizer._resolve_winning_label(
+            [["__Entity__", "__KGBuilder__"], ["__Entity__", "__KGBuilder__"]]
+        )
+        assert result == "Concept"
+
+    def test_resolve_winning_label_single_label(self) -> None:
+        """Test that a single recognized label returns itself."""
+        from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
+        from tests.conftest import MockDriver
+
+        normalizer = EntityNormalizer(MockDriver())
+        result = normalizer._resolve_winning_label([["__Entity__", "Tool"], ["__Entity__", "Tool"]])
+        assert result == "Tool"
+
+    def test_cross_label_dedup_method_exists(self) -> None:
+        """Test that deduplicate_cross_label method exists on EntityNormalizer."""
+        from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
+        from tests.conftest import MockDriver
+
+        normalizer = EntityNormalizer(MockDriver())
+        assert callable(getattr(normalizer, "deduplicate_cross_label", None))
+
+    @pytest.mark.asyncio
+    async def test_cross_label_dedup_no_duplicates(self) -> None:
+        """Test cross-label dedup returns zero when no duplicates exist."""
+        from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
+        from tests.conftest import MockDriver, MockSession
+
+        session = MockSession()
+        session.set_default_result([])
+        driver = MockDriver(session)
+
+        normalizer = EntityNormalizer(driver)
+        stats = await normalizer.deduplicate_cross_label()
+        assert stats["cross_label_merged"] == 0
+        assert stats["by_winning_label"] == {}
+        assert stats["replaced_labels"] == {}
+
+
 class TestMislabeledChallengeDetection:
     """Tests for mislabeled Challenge entity detection."""
 

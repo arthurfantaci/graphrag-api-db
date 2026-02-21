@@ -61,6 +61,12 @@ uv run ruff format .         # Format
 uv run ty check src/         # Type check
 ```
 
+### Pre-Ingestion Validation
+```bash
+# Validate TOC discovery against live site (~2 seconds, no API keys needed)
+uv run python examples/validate_toc_discovery.py
+```
+
 ## Code Style Standards
 
 This project uses strict Python standards enforced by Ruff and ty:
@@ -172,7 +178,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
    - `create_fetcher()` - Factory function for instantiation
 
 3. **scraper.py** - `JamaGuideScraper` orchestrates scraping, `run_scraper()` runs full 5-stage pipeline:
-   - `scrape_all()` → `_discover_guide_structure()` → `_scrape_all_chapters()` → `_scrape_glossary()`
+   - `scrape_all()` → `_discover_guide_structure()` → `_scrape_all_chapters()` → `_scrape_glossary()` → `_enrich_webinar_thumbnails()`
    - Dynamic discovery from `#chapter-menu` TOC (single HTTP request replaces per-chapter discovery)
    - Uses fetcher abstraction via dependency injection
 
@@ -180,6 +186,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
    - `parse_article()` - Extracts title, markdown, sections, cross-references, images, videos
    - `parse_glossary()` - Handles multiple glossary HTML patterns
    - `parse_chapter_menu()` - Parses `#chapter-menu` TOC for dynamic chapter/article discovery
+   - `extract_og_image()` - Extracts `<meta property="og:image">` URL from HTML (used for webinar thumbnail fallback)
 
 5. **models/content.py** - Pydantic models with computed fields for word/character counts.
 
@@ -261,7 +268,10 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - Async with semaphore concurrency (default 3 parallel requests) for respectful scraping
 - Exponential backoff retry on HTTP errors (max 3 retries)
 - **Dynamic TOC Discovery** - All chapters/articles discovered from `#chapter-menu` on the guide's main page (single HTTP request, no static fallback)
+- **OG Image Enrichment** - `_enrich_webinar_thumbnails()` runs inside `scrape_all()` after guide construction, fetches unique webinar landing pages to backfill null `thumbnail_url` via `<meta property="og:image">`
 - Uses `html.parser` (not lxml) for TOC parsing because the source HTML has `<div>` inside `<ul>` — lxml restructures this invalid nesting
+- Cloudflare blocks default httpx User-Agent — always set `User-Agent: JamaGuideScraper/0.1.0 (Educational/Research)` for direct requests
+- Content models (`WebinarReference`, etc.) are mutable Pydantic v2 `BaseModel` — direct attribute assignment works for post-scrape enrichment
 
 **Knowledge Graph Layer:**
 - **Schema-Constrained Extraction** - 10 node types and 10 relationship types prevent schema drift
