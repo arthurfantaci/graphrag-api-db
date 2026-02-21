@@ -1,6 +1,7 @@
 # GraphRAG Knowledge Graph Pipeline
 
 [![CI](https://github.com/arthurfantaci/graphrag-api-db/actions/workflows/ci.yml/badge.svg)](https://github.com/arthurfantaci/graphrag-api-db/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/github/arthurfantaci/graphrag-api-db/branch/main/graph/badge.svg)](https://codecov.io/github/arthurfantaci/graphrag-api-db)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-3776ab.svg?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg?logo=ruff)](https://docs.astral.sh/ruff/)
@@ -27,60 +28,7 @@ A Python ETL pipeline that scrapes Jama Software's **"The Essential Guide to Req
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                        run_scraper() Pipeline                            │
-├──────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  Stage 1: SCRAPE                                                         │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ GuideScraper → Fetcher (httpx/Playwright) → HTML Parser            │  │
-│  │ - Dynamic TOC discovery from #chapter-menu (single HTTP request)   │  │
-│  │ - OG image enrichment for webinar thumbnails                       │  │
-│  │ Output: RequirementsManagementGuide (JSON/JSONL)                   │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                              ↓                                           │
-│  Stage 2: EXTRACT & EMBED (neo4j_graphrag SimpleKGPipeline)             │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ GuideHTMLLoader → HierarchicalHTMLSplitter → LLMEntityRelExtractor│  │
-│  │ - Gleaning: 2-pass LLM extraction for improved recall              │  │
-│  │ - Schema-constrained entity extraction (10 node types)             │  │
-│  │ - Voyage AI voyage-4 embeddings (auto-detected from VOYAGE_API_KEY)│  │
-│  │ - Fallback: OpenAI text-embedding-3-small if no Voyage key        │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                              ↓                                           │
-│  Stage 3: NORMALIZE (Entity Post-Processing — 10 steps)                 │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  1. EntityNormalizer — lowercase + trim                            │  │
-│  │  2. EntityNormalizer — deduplicate by name                         │  │
-│  │  3. EntityCleanupNormalizer — generics + plurals                   │  │
-│  │  4. IndustryNormalizer — consolidate 100+ → 18 industries         │  │
-│  │  5. MentionedInBackfiller — MENTIONED_IN + APPLIES_TO rels        │  │
-│  │  6. EntitySummarizer — LLM entity descriptions                    │  │
-│  │  7. LangExtractAugmenter — source grounding (text provenance)    │  │
-│  │  8. CommunityDetector — Leiden clustering                         │  │
-│  │  9. CommunitySummarizer — LLM community summaries                │  │
-│  │ 10. CommunityEmbedder — Voyage AI community vectors             │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                              ↓                                           │
-│  Stage 4: SUPPLEMENT (Graph Structure)                                   │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ SupplementaryGraphBuilder                                          │  │
-│  │ - Chapter nodes + Article relationships                            │  │
-│  │ - Resource nodes (Image, Video, Webinar)                           │  │
-│  │ - Glossary structure + concept linking                             │  │
-│  │ - Community summary vector index                                   │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                              ↓                                           │
-│  Stage 5: VALIDATE (Optional)                                            │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ ValidationQueries → ValidationReporter                             │  │
-│  │ - Orphan chunk detection, entity quality, relationship patterns    │  │
-│  │ - Auto-archived reports with ISO 8601 timestamps                   │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-```
+![Architecture](docs/architecture.svg)
 
 ## Requirements
 
