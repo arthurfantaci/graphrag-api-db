@@ -758,6 +758,20 @@ async def _run_post_processing(_output_dir: Path) -> None:
                 summ_stats = await summarizer.summarize_communities()
                 console.print(f"    Summarized {summ_stats['communities_summarized']} communities")
 
+            # Community summary embeddings (optional — requires Voyage AI)
+            if config.voyage_api_key:
+                from .graph.community_embedder import CommunityEmbedder
+
+                console.print("  Embedding community summaries (Voyage AI)...")
+                embedder = CommunityEmbedder(
+                    driver=driver,
+                    database=config.neo4j_database,
+                    model=config.voyage_model,
+                    dimensions=config.embedding_dimensions,
+                )
+                embed_stats = await embedder.embed_community_summaries()
+                console.print(f"    Embedded {embed_stats['embedded']} community summaries")
+
         except ImportError:
             pass  # leidenalg/igraph not installed — skip community detection
 
@@ -780,6 +794,7 @@ async def _build_supplementary_structure(
     from .extraction.pipeline import JamaKGPipelineConfig, create_async_neo4j_driver
     from .graph.constraints import (
         create_all_constraints,
+        create_community_vector_index,
         create_fulltext_index,
         create_vector_index,
     )
@@ -795,6 +810,11 @@ async def _build_supplementary_structure(
         console.print("  Creating constraints and indexes...")
         await create_all_constraints(driver, config.neo4j_database)
         await create_vector_index(
+            driver,
+            config.neo4j_database,
+            dimensions=config.embedding_dimensions,
+        )
+        await create_community_vector_index(
             driver,
             config.neo4j_database,
             dimensions=config.embedding_dimensions,
