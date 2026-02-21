@@ -17,10 +17,10 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from neo4j import AsyncGraphDatabase
+from neo4j import AsyncDriver, AsyncGraphDatabase
 
 
-async def run_query(driver, database: str, description: str, query: str) -> list[dict]:
+async def run_query(driver: AsyncDriver, database: str, description: str, query: str) -> list[dict]:
     """Run a Cypher query and print results."""
     print(f"\n{'─' * 60}")
     print(f"  {description}")
@@ -59,74 +59,133 @@ async def main() -> None:
     # ── Step 1: Characterize the anomaly ──────────────────────
     print("\n\n>>> STEP 1: Characterize the anomaly")
 
-    await run_query(driver, db, "1a. Total Concept nodes", """
+    await run_query(
+        driver,
+        db,
+        "1a. Total Concept nodes",
+        """
         MATCH (n:Concept) RETURN count(n) AS concept_count
-    """)
+    """,
+    )
 
-    await run_query(driver, db, "1b. Concept nodes WITH __Entity__", """
+    await run_query(
+        driver,
+        db,
+        "1b. Concept nodes WITH __Entity__",
+        """
         MATCH (n:Concept) WHERE n:__Entity__ RETURN count(n) AS with_entity
-    """)
+    """,
+    )
 
-    await run_query(driver, db, "1c. Concept nodes WITHOUT __Entity__", """
+    await run_query(
+        driver,
+        db,
+        "1c. Concept nodes WITHOUT __Entity__",
+        """
         MATCH (n:Concept) WHERE NOT n:__Entity__ RETURN count(n) AS without_entity
-    """)
+    """,
+    )
 
-    await run_query(driver, db, "1d. Total __Entity__ nodes", """
+    await run_query(
+        driver,
+        db,
+        "1d. Total __Entity__ nodes",
+        """
         MATCH (n:__Entity__) RETURN count(n) AS entity_count
-    """)
+    """,
+    )
 
-    await run_query(driver, db, "1e. Concept nodes WITHOUT __KGBuilder__", """
+    await run_query(
+        driver,
+        db,
+        "1e. Concept nodes WITHOUT __KGBuilder__",
+        """
         MATCH (n:Concept) WHERE NOT n:__KGBuilder__ RETURN count(n) AS without_kgbuilder
-    """)
+    """,
+    )
 
     # ── Step 2: Check multi-labeling issues ───────────────────
     print("\n\n>>> STEP 2: Check multi-labeling issues")
 
-    await run_query(driver, db, "2a. Concept nodes with extra type labels", """
+    await run_query(
+        driver,
+        db,
+        "2a. Concept nodes with extra type labels",
+        """
         MATCH (n:Concept)
         WITH n, [l IN labels(n) WHERE NOT l STARTS WITH '__' AND l <> 'Concept'] AS extras
         WHERE size(extras) > 0
         RETURN extras, count(n) AS cnt
         ORDER BY cnt DESC
-    """)
+    """,
+    )
 
-    await run_query(driver, db, "2b. Label combos of Concept nodes WITHOUT __Entity__", """
+    await run_query(
+        driver,
+        db,
+        "2b. Label combos of Concept nodes WITHOUT __Entity__",
+        """
         MATCH (n:Concept) WHERE NOT n:__Entity__
         RETURN labels(n) AS all_labels, count(n) AS cnt
         ORDER BY cnt DESC LIMIT 10
-    """)
+    """,
+    )
 
     # ── Step 3: Sample orphaned/suspicious nodes ──────────────
     print("\n\n>>> STEP 3: Sample orphaned/suspicious nodes")
 
-    await run_query(driver, db, "3a. Sample Concept nodes without __Entity__", """
+    await run_query(
+        driver,
+        db,
+        "3a. Sample Concept nodes without __Entity__",
+        """
         MATCH (n:Concept) WHERE NOT n:__Entity__
         RETURN n.name, labels(n) AS all_labels, keys(n) AS props
         LIMIT 15
-    """)
+    """,
+    )
 
-    await run_query(driver, db, "3b. Disconnected Concept nodes without __Entity__", """
+    await run_query(
+        driver,
+        db,
+        "3b. Disconnected Concept nodes without __Entity__",
+        """
         MATCH (n:Concept) WHERE NOT n:__Entity__ AND NOT (n)--()
         RETURN count(n) AS disconnected_count
-    """)
+    """,
+    )
 
-    await run_query(driver, db, "3c. Concept nodes w/o __Entity__ by relationship type", """
+    await run_query(
+        driver,
+        db,
+        "3c. Concept nodes w/o __Entity__ by relationship type",
+        """
         MATCH (n:Concept)-[r]-()
         WHERE NOT n:__Entity__
         RETURN type(r) AS rel_type, count(r) AS cnt
         ORDER BY cnt DESC LIMIT 10
-    """)
+    """,
+    )
 
     # ── Step 4: Check if gleaning is the source ──────────────
     print("\n\n>>> STEP 4: Check gleaning hypothesis")
 
-    await run_query(driver, db, "4a. Concept w/o __Entity__ that have MENTIONED_IN rels", """
+    await run_query(
+        driver,
+        db,
+        "4a. Concept w/o __Entity__ that have MENTIONED_IN rels",
+        """
         MATCH (n:Concept)-[:MENTIONED_IN]->(c:Chunk)
         WHERE NOT n:__Entity__
         RETURN count(DISTINCT n) AS gleaned_with_mentions
-    """)
+    """,
+    )
 
-    await run_query(driver, db, "4b. ALL entity-type nodes without __Entity__", """
+    await run_query(
+        driver,
+        db,
+        "4b. ALL entity-type nodes without __Entity__",
+        """
         MATCH (n)
         WHERE any(lbl IN labels(n) WHERE lbl IN
             ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
@@ -135,21 +194,31 @@ async def main() -> None:
         WITH [l IN labels(n) WHERE NOT l STARTS WITH '__'] AS type_labels, count(n) AS cnt
         RETURN type_labels, cnt
         ORDER BY cnt DESC
-    """)
+    """,
+    )
 
-    await run_query(driver, db, "4c. Concept w/o __Entity__ that overlap __Entity__ names", """
+    await run_query(
+        driver,
+        db,
+        "4c. Concept w/o __Entity__ that overlap __Entity__ names",
+        """
         MATCH (n:Concept) WHERE NOT n:__Entity__
         WITH n.name AS name, count(n) AS orphan_count
         OPTIONAL MATCH (e:__Entity__ {name: name})
         RETURN
             count(CASE WHEN e IS NOT NULL THEN 1 END) AS has_entity_counterpart,
             count(CASE WHEN e IS NULL THEN 1 END) AS no_entity_counterpart
-    """)
+    """,
+    )
 
     # ── Step 5: Summary counts for all entity labels ──────────
     print("\n\n>>> STEP 5: Full entity label breakdown")
 
-    await run_query(driver, db, "5a. Per-label counts WITH and WITHOUT __Entity__", """
+    await run_query(
+        driver,
+        db,
+        "5a. Per-label counts WITH and WITHOUT __Entity__",
+        """
         MATCH (n)
         WHERE any(lbl IN labels(n) WHERE lbl IN
             ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
@@ -158,7 +227,8 @@ async def main() -> None:
              CASE WHEN n:__Entity__ THEN 'yes' ELSE 'no' END AS has_entity
         RETURN type_label, has_entity, count(*) AS cnt
         ORDER BY type_label, has_entity
-    """)
+    """,
+    )
 
     await driver.close()
 
