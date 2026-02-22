@@ -38,6 +38,9 @@ ENV/
 # Claude Code
 .claude/
 
+# MCP configuration (contains local paths)
+.mcp.json
+
 # IDE
 .idea/
 *.swp

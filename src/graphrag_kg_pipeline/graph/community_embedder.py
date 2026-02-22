@@ -59,20 +59,22 @@ class CommunityEmbedder:
         via Voyage AI, and writes vectors back to Neo4j.
 
         Returns:
-            Statistics dict with embedded and skipped counts.
+            Statistics dict with embedded, errors, and total counts.
         """
         import voyageai
+        import voyageai.error
 
-        client = voyageai.AsyncClient()
+        client = voyageai.AsyncClient(max_retries=3)
 
         # Fetch communities needing embeddings
         communities = await self._get_communities_without_embeddings()
 
         if not communities:
             logger.info("All communities already have embeddings")
-            return {"embedded": 0, "skipped": 0, "total": 0}
+            return {"embedded": 0, "errors": 0, "total": 0}
 
         total_embedded = 0
+        total_errors = 0
 
         # Process in batches
         for batch_start in range(0, len(communities), _VOYAGE_BATCH_SIZE):
@@ -80,29 +82,39 @@ class CommunityEmbedder:
             texts = [c["summary"] for c in batch]
             community_ids = [c["communityId"] for c in batch]
 
-            result = await client.embed(
-                texts,
-                model=self.model,
-                input_type="document",
-                output_dimension=self.dimensions,
-            )
+            try:
+                result = await client.embed(
+                    texts,
+                    model=self.model,
+                    input_type="document",
+                    output_dimension=self.dimensions,
+                )
 
-            # Write embeddings back to Neo4j
-            for cid, embedding in zip(community_ids, result.embeddings, strict=True):
-                await self._set_embedding(cid, embedding)
+                # Write embeddings back to Neo4j
+                for cid, embedding in zip(community_ids, result.embeddings, strict=True):
+                    await self._set_embedding(cid, embedding)
 
-            total_embedded += len(batch)
+                total_embedded += len(batch)
+
+            except voyageai.error.VoyageError:
+                total_errors += len(batch)
+                logger.warning(
+                    "Voyage AI embedding failed for batch",
+                    batch_start=batch_start,
+                    batch_size=len(batch),
+                    exc_info=True,
+                )
 
         logger.info(
             "Community summary embedding complete",
             embedded=total_embedded,
-            already_had_embeddings=0,
+            errors=total_errors,
         )
 
         return {
             "embedded": total_embedded,
-            "skipped": 0,
-            "total": total_embedded,
+            "errors": total_errors,
+            "total": total_embedded + total_errors,
         }
 
     async def _get_communities_without_embeddings(self) -> list[dict[str, Any]]:

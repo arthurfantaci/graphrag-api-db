@@ -10,6 +10,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import structlog
+import tenacity
+
+from graphrag_kg_pipeline.utils.retry import langextract_retry
 
 if TYPE_CHECKING:
     from neo4j import AsyncDriver
@@ -110,14 +113,11 @@ class LangExtractAugmenter:
                 continue
 
             try:
-                result = lx.extract(
-                    text_or_documents=chunk_text,
-                    prompt_description=prompt,
+                result = self._extract_with_retry(
+                    lx=lx,
+                    chunk_text=chunk_text,
+                    prompt=prompt,
                     examples=examples,
-                    model_id=self.model,
-                    api_key=self.openai_api_key,
-                    fence_output=True,
-                    use_schema_constraints=False,
                 )
 
                 for entity in result.extractions:
@@ -152,6 +152,12 @@ class LangExtractAugmenter:
                         )
                         self.grounded_count += 1
 
+            except tenacity.RetryError:
+                logger.warning(
+                    "API rate limit exhausted after retries for LangExtract",
+                    chunk_id=chunk_id,
+                    exc_info=True,
+                )
             except Exception:
                 logger.warning(
                     "LangExtract failed for chunk, skipping",
@@ -169,6 +175,34 @@ class LangExtractAugmenter:
             "new_entities": self.new_count,
             "grounded_entities": self.grounded_count,
         }
+
+    @langextract_retry
+    def _extract_with_retry(
+        self, *, lx: Any, chunk_text: str, prompt: str, examples: list[Any]
+    ) -> Any:
+        """Call langextract with retry on wrapped rate limit errors.
+
+        langextract wraps OpenAI errors in ``InferenceRuntimeError(original=e)``,
+        so we use a custom predicate to unwrap and match retryable errors.
+
+        Args:
+            lx: The langextract module.
+            chunk_text: Text to extract entities from.
+            prompt: Extraction prompt description.
+            examples: Few-shot examples.
+
+        Returns:
+            The langextract extraction result.
+        """
+        return lx.extract(
+            text_or_documents=chunk_text,
+            prompt_description=prompt,
+            examples=examples,
+            model_id=self.model,
+            api_key=self.openai_api_key,
+            fence_output=True,
+            use_schema_constraints=False,
+        )
 
     def _build_examples(self) -> list[Any]:
         """Build few-shot examples for LangExtract.
