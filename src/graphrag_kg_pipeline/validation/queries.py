@@ -71,7 +71,8 @@ class ValidationQueries:
         MATCH (n)
         WHERE any(label IN labels(n) WHERE label IN
             ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+             'Organization', 'Outcome'])
         AND NOT (n)--()
         RETURN labels(n)[0] AS label, n.name AS name, elementId(n) AS element_id
         LIMIT 100
@@ -91,7 +92,8 @@ class ValidationQueries:
         MATCH (n)
         WHERE any(label IN labels(n) WHERE label IN
             ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+             'Organization', 'Outcome'])
         WITH labels(n)[0] AS label, n.name AS name, count(n) AS cnt
         WHERE cnt > 1
         RETURN label, name, cnt
@@ -184,10 +186,12 @@ class ValidationQueries:
         MATCH (a)-[r]->(b)
         WHERE any(label IN labels(a) WHERE label IN
             ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+             'Organization', 'Outcome'])
         AND any(label IN labels(b) WHERE label IN
             ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+             'Organization', 'Outcome'])
         AND NOT ({exclusion_clause})
         RETURN labels(a)[0] AS source_label, type(r) AS rel_type,
                labels(b)[0] AS target_label, count(*) AS count
@@ -482,7 +486,8 @@ class ValidationQueries:
         MATCH (e)-[:MENTIONED_IN]->(:Chunk)
         WHERE any(lbl IN labels(e) WHERE lbl IN
             ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+             'Organization', 'Outcome'])
         AND NOT EXISTS {
             MATCH (e)-[r]->()
             WHERE type(r) <> 'MENTIONED_IN'
@@ -537,7 +542,8 @@ class ValidationQueries:
         MATCH (a), (b)
         WHERE any(lbl IN labels(a) WHERE lbl IN
             ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+             'Organization', 'Outcome'])
         AND labels(a)[0] = labels(b)[0]
         AND a.name IS NOT NULL AND b.name IS NOT NULL
         AND a.name <> b.name
@@ -566,7 +572,8 @@ class ValidationQueries:
         MATCH (e)
         WHERE any(lbl IN labels(e) WHERE lbl IN
             ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-             'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+             'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+             'Organization', 'Outcome'])
         AND (e.definition IS NULL OR e.definition = '')
         WITH labels(e)[0] AS label, count(e) AS count
         RETURN label, count

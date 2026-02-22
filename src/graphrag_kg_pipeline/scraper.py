@@ -476,6 +476,7 @@ async def run_scraper(
     skip_resources: bool = False,
     skip_supplementary: bool = False,
     run_validation: bool = False,
+    run_full: bool = False,
 ) -> RequirementsManagementGuide:
     """Run the complete neo4j_graphrag pipeline.
 
@@ -486,6 +487,11 @@ async def run_scraper(
     4. Create supplementary structure (chapters, resources, glossary)
     5. Run validation checks (optional)
 
+    When ``run_full`` is True, additional stages are integrated:
+    - Chunk repair (degenerate chunks, missing indices, chunk_ids)
+    - Validation fixes (mislabeled entities, webinar titles, definitions)
+    - Re-validation after fixes to confirm data quality
+
     Args:
         output_dir: Directory for output files.
         use_browser: If True, use Playwright for JS rendering.
@@ -493,6 +499,7 @@ async def run_scraper(
         skip_resources: If True, skip resource node creation.
         skip_supplementary: If True, skip all supplementary graph structure.
         run_validation: If True, run validation and generate report.
+        run_full: If True, run all stages including fixes and re-validation.
 
     Returns:
         The scraped guide data.
@@ -520,15 +527,22 @@ async def run_scraper(
     # Stage 2: Process through neo4j_graphrag pipeline
     pipeline_stats = await _run_neo4j_graphrag_pipeline(guide, output_dir)
 
-    # Stage 3: Post-processing (entity normalization, industry consolidation)
+    # Stage 2.5 (--full only): Chunk repair before entity creation
+    if run_full:
+        await _run_chunk_repair(output_dir)
+
+    # Stage 3: Post-processing (entity creation → cleanup → graph analysis)
     await _run_post_processing(output_dir)
 
     # Stage 4: Supplementary graph structure
     if not skip_supplementary:
         await _build_supplementary_structure(guide, output_dir, skip_resources=skip_resources)
 
-    # Stage 5: Validation (optional)
-    if run_validation:
+    # Stage 5 (--full): Apply validation fixes, then re-validate
+    if run_full:
+        await _run_validation_fixes(output_dir)
+        await _run_validation(output_dir)
+    elif run_validation:
         await _run_validation(output_dir)
 
     console.print("\n[bold green]✓ Pipeline complete![/]")
@@ -599,6 +613,76 @@ async def _run_preflight(_output_dir: Path) -> None:
         await driver.close()
 
 
+async def _run_chunk_repair(_output_dir: Path) -> None:
+    """Repair chunk data quality issues before entity creation.
+
+    Fixes degenerate chunks, missing indices, and missing chunk_ids.
+    These must be resolved before backfill and LangExtract operate on chunks.
+
+    Args:
+        _output_dir: Directory for output files (reserved for future use).
+    """
+    from .extraction.pipeline import KGPipelineConfig, create_async_neo4j_driver
+    from .validation.fixes import (
+        fix_degenerate_chunks,
+        fix_missing_chunk_ids,
+        fix_missing_chunk_index,
+    )
+
+    console.print("\n[bold cyan]Repairing chunk data...[/]")
+
+    config = KGPipelineConfig.from_env()
+    driver = create_async_neo4j_driver(config)
+
+    try:
+        degen = await fix_degenerate_chunks(driver, config.neo4j_database, dry_run=False)
+        console.print(f"    Deleted {degen.get('deleted', 0)} degenerate chunks")
+
+        idx = await fix_missing_chunk_index(driver, config.neo4j_database, dry_run=False)
+        console.print(f"    Re-indexed {idx.get('fixed', 0)} chunks")
+
+        ids = await fix_missing_chunk_ids(driver, config.neo4j_database, dry_run=False)
+        console.print(f"    Generated {ids.get('fixed', 0)} chunk_ids")
+    finally:
+        await driver.close()
+
+
+async def _run_validation_fixes(_output_dir: Path) -> None:
+    """Apply validation fixes after the main pipeline completes.
+
+    Runs the subset of fixes not already covered by post-processing:
+    - Truncated webinar titles
+    - Mislabeled entities (Challenge → Outcome)
+    - Missing definitions backfill
+
+    Args:
+        _output_dir: Directory for output files (reserved for future use).
+    """
+    from .extraction.pipeline import KGPipelineConfig, create_async_neo4j_driver
+    from .validation.fixes import (
+        fix_mislabeled_entities,
+        fix_missing_definitions,
+        fix_truncated_webinar_titles,
+    )
+
+    console.print("\n[bold cyan]Applying validation fixes...[/]")
+
+    config = KGPipelineConfig.from_env()
+    driver = create_async_neo4j_driver(config)
+
+    try:
+        titles = await fix_truncated_webinar_titles(driver, config.neo4j_database, dry_run=False)
+        console.print(f"    Fixed {titles.get('fixed', 0)} webinar titles")
+
+        mislabeled = await fix_mislabeled_entities(driver, config.neo4j_database, dry_run=False)
+        console.print(f"    Relabeled {mislabeled.get('relabeled', 0)} mislabeled entities")
+
+        defs = await fix_missing_definitions(driver, config.neo4j_database, dry_run=False)
+        console.print(f"    Backfilled {defs.get('created', 0)} definitions")
+    finally:
+        await driver.close()
+
+
 async def _run_neo4j_graphrag_pipeline(
     guide: RequirementsManagementGuide,
     output_dir: Path,
@@ -635,7 +719,12 @@ async def _run_neo4j_graphrag_pipeline(
 
 
 async def _run_post_processing(_output_dir: Path) -> None:
-    """Run post-processing: entity normalization and industry consolidation.
+    """Run post-processing in three phases: create, cleanup, analyze.
+
+    Phase A — Entity Creation: all entity-creating steps run first.
+    Phase B — Entity Cleanup: normalization, dedup, and consolidation on the
+              complete entity set (including LangExtract entities).
+    Phase C — Graph Analysis: Leiden community detection runs on clean data.
 
     Args:
         _output_dir: Directory for output files (reserved for future use).
@@ -650,45 +739,12 @@ async def _run_post_processing(_output_dir: Path) -> None:
     driver = create_async_neo4j_driver(config)
 
     try:
-        # Entity normalization
-        console.print("  Normalizing entity names...")
-        normalizer = EntityNormalizer(driver, config.neo4j_database)
-        norm_stats = await normalizer.normalize_all_entities()
-        console.print(f"    Updated {norm_stats['updated']} entity names")
+        # =================================================================
+        # Phase A: Entity Creation (all entity-creating steps first)
+        # =================================================================
+        console.print("\n  [bold]Phase A: Entity Creation[/]")
 
-        # Entity deduplication
-        console.print("  Deduplicating entities...")
-        dedup_stats = await normalizer.deduplicate_by_name()
-        console.print(f"    Merged {dedup_stats['merged']} duplicates")
-
-        # Cross-label deduplication (same name, different type labels)
-        console.print("  Deduplicating cross-label entities...")
-        cross_dedup_stats = await normalizer.deduplicate_cross_label()
-        console.print(
-            f"    Merged {cross_dedup_stats['cross_label_merged']} cross-label duplicates"
-        )
-
-        # Entity cleanup (generic terms + plural merging)
-        console.print("  Cleaning up generic and plural entities...")
-        from .postprocessing.entity_cleanup import EntityCleanupNormalizer
-
-        cleanup_normalizer = EntityCleanupNormalizer(driver, config.neo4j_database)
-        cleanup_stats = await cleanup_normalizer.run_cleanup()
-        console.print(
-            f"    Deleted {cleanup_stats['deleted_generic']} generic entities, "
-            f"merged {cleanup_stats['merged_plurals']} plurals"
-        )
-
-        # Industry consolidation
-        console.print("  Consolidating industries...")
-        industry_normalizer = IndustryNormalizer(driver, config.neo4j_database)
-        industry_stats = await industry_normalizer.consolidate_industries()
-        console.print(
-            f"    Consolidated {industry_stats['original_count']} → "
-            f"{industry_stats['canonical_count']} industries"
-        )
-
-        # MENTIONED_IN + APPLIES_TO backfill
+        # A.1 MENTIONED_IN + APPLIES_TO backfill (may create Industry nodes)
         console.print("  Backfilling MENTIONED_IN and APPLIES_TO relationships...")
         from .postprocessing.mentioned_in_backfill import MentionedInBackfiller
 
@@ -699,21 +755,7 @@ async def _run_post_processing(_output_dir: Path) -> None:
             f"{backfill_stats['applies_to_created']} APPLIES_TO"
         )
 
-        # Entity description summarization
-        if config.openai_api_key:
-            console.print("  Summarizing entity descriptions...")
-            from .postprocessing.entity_summarizer import EntitySummarizer
-
-            summarizer = EntitySummarizer(
-                driver=driver,
-                database=config.neo4j_database,
-                openai_api_key=config.openai_api_key,
-                model=config.llm_model,
-            )
-            summ_stats = await summarizer.summarize()
-            console.print(f"    Summarized {summ_stats['entities_summarized']} entities")
-
-        # LangExtract augmentation (optional — requires langextract[openai])
+        # A.2 LangExtract augmentation (creates new entities of all types)
         try:
             from .postprocessing.langextract_augmenter import LangExtractAugmenter
 
@@ -733,9 +775,70 @@ async def _run_post_processing(_output_dir: Path) -> None:
         except ImportError:
             pass  # langextract not installed — skip augmentation
 
-        # Leiden community detection
+        # =================================================================
+        # Phase B: Entity Cleanup (on the complete entity set)
+        # =================================================================
+        console.print("\n  [bold]Phase B: Entity Cleanup[/]")
+
+        # B.1 Entity normalization (lowercase, trim)
+        console.print("  Normalizing entity names...")
+        normalizer = EntityNormalizer(driver, config.neo4j_database)
+        norm_stats = await normalizer.normalize_all_entities()
+        console.print(f"    Updated {norm_stats['updated']} entity names")
+
+        # B.2 Same-label deduplication
+        console.print("  Deduplicating entities...")
+        dedup_stats = await normalizer.deduplicate_by_name()
+        console.print(f"    Merged {dedup_stats['merged']} duplicates")
+
+        # B.3 Cross-label deduplication
+        console.print("  Deduplicating cross-label entities...")
+        cross_dedup_stats = await normalizer.deduplicate_cross_label()
+        console.print(
+            f"    Merged {cross_dedup_stats['cross_label_merged']} cross-label duplicates"
+        )
+
+        # B.4 Entity cleanup (generic terms + plural merging)
+        console.print("  Cleaning up generic and plural entities...")
+        from .postprocessing.entity_cleanup import EntityCleanupNormalizer
+
+        cleanup_normalizer = EntityCleanupNormalizer(driver, config.neo4j_database)
+        cleanup_stats = await cleanup_normalizer.run_cleanup()
+        console.print(
+            f"    Deleted {cleanup_stats['deleted_generic']} generic entities, "
+            f"merged {cleanup_stats['merged_plurals']} plurals"
+        )
+
+        # B.5 Industry consolidation
+        console.print("  Consolidating industries...")
+        industry_normalizer = IndustryNormalizer(driver, config.neo4j_database)
+        industry_stats = await industry_normalizer.consolidate_industries()
+        console.print(
+            f"    Consolidated {industry_stats['original_count']} → "
+            f"{industry_stats['canonical_count']} industries"
+        )
+
+        # B.6 Entity description summarization (on cleaned, deduplicated entities)
+        if config.openai_api_key:
+            console.print("  Summarizing entity descriptions...")
+            from .postprocessing.entity_summarizer import EntitySummarizer
+
+            summarizer = EntitySummarizer(
+                driver=driver,
+                database=config.neo4j_database,
+                openai_api_key=config.openai_api_key,
+                model=config.llm_model,
+            )
+            summ_stats = await summarizer.summarize()
+            console.print(f"    Summarized {summ_stats['entities_summarized']} entities")
+
+        # =================================================================
+        # Phase C: Graph Analysis (runs on fully cleaned data)
+        # =================================================================
         try:
             from .graph.community_detection import CommunityDetector
+
+            console.print("\n  [bold]Phase C: Graph Analysis[/]")
 
             console.print("  Running Leiden community detection...")
             detector = CommunityDetector(driver=driver, database=config.neo4j_database)
@@ -750,13 +853,15 @@ async def _run_post_processing(_output_dir: Path) -> None:
                 from .graph.community_summarizer import CommunitySummarizer
 
                 console.print("  Generating community summaries...")
-                summarizer = CommunitySummarizer(
+                comm_summarizer = CommunitySummarizer(
                     driver=driver,
                     database=config.neo4j_database,
                     openai_api_key=config.openai_api_key,
                 )
-                summ_stats = await summarizer.summarize_communities()
-                console.print(f"    Summarized {summ_stats['communities_summarized']} communities")
+                comm_summ_stats = await comm_summarizer.summarize_communities()
+                console.print(
+                    f"    Summarized {comm_summ_stats['communities_summarized']} communities"
+                )
 
             # Community summary embeddings (optional — requires Voyage AI)
             if config.voyage_api_key:

@@ -224,11 +224,11 @@ class TestCrossLabelDeduplication:
     """Tests for cross-label entity deduplication."""
 
     def test_label_priority_ranking_defined(self) -> None:
-        """Test that LABEL_PRIORITY constant exists and has all 10 labels."""
+        """Test that LABEL_PRIORITY constant exists and has all 12 labels."""
         from graphrag_kg_pipeline.postprocessing.normalizer import EntityNormalizer
 
         assert hasattr(EntityNormalizer, "LABEL_PRIORITY")
-        assert len(EntityNormalizer.LABEL_PRIORITY) == 10
+        assert len(EntityNormalizer.LABEL_PRIORITY) == 12
 
     def test_label_priority_covers_entity_labels(self) -> None:
         """Test that LABEL_PRIORITY covers the same labels as entity_labels."""

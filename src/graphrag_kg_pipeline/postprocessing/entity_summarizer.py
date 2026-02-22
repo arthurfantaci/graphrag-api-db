@@ -82,7 +82,7 @@ class EntitySummarizer:
         AND any(lbl IN labels(e) WHERE lbl IN [
             'Concept', 'Challenge', 'Artifact', 'Bestpractice',
             'Processstage', 'Role', 'Standard', 'Tool',
-            'Methodology', 'Industry'
+            'Methodology', 'Industry', 'Organization', 'Outcome'
         ])
         WITH e, labels(e)[0] AS label, e.description AS desc
         WHERE size(desc) > 200

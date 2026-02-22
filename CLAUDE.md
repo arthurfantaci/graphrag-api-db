@@ -31,6 +31,8 @@ graphrag-kg scrape --skip-resources   # Skip Image/Video/Webinar nodes
 graphrag-kg scrape --skip-supplementary  # Skip chapters, resources, glossary
 graphrag-kg scrape --dry-run          # Estimate costs without running
 graphrag-kg scrape --browser          # Use Playwright for JS-rendered content
+graphrag-kg scrape --full             # Full pipeline: scrape + extract + normalize + validate + fix
+graphrag-kg scrape --full --dry-run   # Preview full pipeline costs
 
 # Validate and fix data quality
 graphrag-kg validate                  # Run validation checks
@@ -115,18 +117,22 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 │  │ - Fallback: OpenAI text-embedding-3-small if no Voyage key        │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                              ↓                                           │
-│  Stage 3: NORMALIZE (Entity Post-Processing)                            │
+│  Stage 3: NORMALIZE (3-Phase Entity Post-Processing)                    │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ 1. EntityNormalizer.normalize_all_entities() — lowercase + trim   │  │
-│  │ 2. EntityNormalizer.deduplicate_by_name() — merge duplicates      │  │
-│  │ 3. EntityCleanupNormalizer.run_cleanup() — generics + plurals     │  │
-│  │ 4. IndustryNormalizer.consolidate_industries() — 100+ → 18       │  │
-│  │ 5. MentionedInBackfiller.backfill() — MENTIONED_IN + APPLIES_TO  │  │
-│  │ 6. EntitySummarizer.summarize() — LLM entity descriptions        │  │
-│  │ 7. LangExtractAugmenter.augment() — source grounding (optional) │  │
-│  │ 8. CommunityDetector.detect_communities() — Leiden clustering   │  │
-│  │ 9. CommunitySummarizer.summarize_communities() — LLM summaries  │  │
-│  │ 10. CommunityEmbedder.embed_community_summaries() — vectors   │  │
+│  │ Phase A — Entity Creation (all entity-creating steps first):      │  │
+│  │   1. MentionedInBackfiller.backfill() — MENTIONED_IN + APPLIES_TO│  │
+│  │   2. LangExtractAugmenter.augment() — source grounding           │  │
+│  │ Phase B — Entity Cleanup (runs after all entities exist):         │  │
+│  │   3. EntityNormalizer.normalize_all_entities() — lowercase + trim │  │
+│  │   4. EntityNormalizer.deduplicate_by_name() — merge duplicates    │  │
+│  │   5. EntityNormalizer.deduplicate_cross_label() — cross-label     │  │
+│  │   6. EntityCleanupNormalizer.run_cleanup() — generics + plurals   │  │
+│  │   7. IndustryNormalizer.consolidate_industries() — taxonomy       │  │
+│  │   8. EntitySummarizer.summarize() — LLM entity descriptions      │  │
+│  │ Phase C — Graph Analysis (on clean entities):                     │  │
+│  │   9. CommunityDetector.detect_communities() — Leiden clustering   │  │
+│  │  10. CommunitySummarizer.summarize_communities() — LLM summaries  │  │
+│  │  11. CommunityEmbedder.embed_community_summaries() — vectors      │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                              ↓                                           │
 │  Stage 4: SUPPLEMENT (Graph Structure)                                   │
@@ -196,9 +202,9 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 **Extraction (Stage 2):**
 
 7. **extraction/schema.py** - Knowledge graph schema:
-   - `NODE_TYPES` - 10 types: Concept, Challenge, Artifact, Industry, Standard, Tool, etc.
-   - `RELATIONSHIP_TYPES` - 10 types: ADDRESSES, REQUIRES, COMPONENT_OF, APPLIES_TO, etc.
-   - `PATTERNS` - ~30 validation patterns for entity names
+   - `NODE_TYPES` - 12 types: Concept, Challenge, Artifact, Industry, Standard, Tool, Organization, Outcome, etc.
+   - `RELATIONSHIP_TYPES` - 14 types: ADDRESSES, REQUIRES, COMPONENT_OF, APPLIES_TO, PUBLISHES, REGULATES, DEVELOPS, ACHIEVES, etc.
+   - `PATTERNS` - ~50 validated (source, rel, target) triples
 
 8. **extraction/pipeline.py** - `neo4j_graphrag` integration:
    - `KGPipelineConfig` - Pipeline configuration dataclass
@@ -278,13 +284,15 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - Content models (`WebinarReference`, etc.) are mutable Pydantic v2 `BaseModel` — direct attribute assignment works for post-scrape enrichment
 
 **Knowledge Graph Layer:**
-- **Schema-Constrained Extraction** - 10 node types and 10 relationship types prevent schema drift
+- **Schema-Constrained Extraction** - 12 node types and 14 relationship types prevent schema drift
+- **Organization vs Industry** - `ORGANIZATIONS_NOT_INDUSTRIES` set in `industry_taxonomy.py` relabels orgs (NASA, FDA, IEEE) from Industry to Organization during consolidation
+- **LangExtract Entity Labels** - `_create_entity()` MERGE must set `__Entity__:__KGBuilder__` labels on creation for cross-label dedup visibility
 - **Industry Taxonomy** - 100+ variants normalized to 18 canonical industries
 - **Entity Deduplication** - Plural forms merged (e.g., "requirement" + "requirements" → "requirement")
 - **Hierarchical Chunking** - LangChain HTMLHeaderTextSplitter preserves document structure; optional Chonkie SemanticChunker for stage 2
 - **Voyage AI Embeddings** - Auto-detected from `VOYAGE_API_KEY` env var; asymmetric `input_type` ("document" for indexing, "query" for search)
 - **Community Detection** - Leiden algorithm via `leidenalg` (reference implementation). Only semantic relationship types projected (not structural). Communities get LLM-generated summaries.
-- **LangExtract Augmentation** - Post-processing entity augmentation with source grounding (text span provenance). Runs after all other cleanup to avoid introducing duplicates.
+- **LangExtract Augmentation** - Post-processing entity augmentation with source grounding (text span provenance). Runs in Phase A (before cleanup) so new entities get normalized in Phase B.
 - **Supplementary Structure** - Chapter, Resource, and Glossary nodes add navigational context
 
 **Data Quality:**
