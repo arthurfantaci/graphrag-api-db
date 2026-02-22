@@ -151,23 +151,33 @@ CORRECT extraction:
 - ✓ (aerospace)-[USED_BY]->(matlab)
 - ✗ (automation)-[USED_BY]->(jama connect)
 
-### ✗ WRONG: Certification Organizations as Standards
+### Organization vs Standard Distinction (IMPORTANT!)
 Text: "TÜV SÜD certified the product for functional safety compliance."
 
 INCORRECT extraction:
 - Entity: Standard (name: "tüv süd")  ← WRONG! TÜV SÜD is an organization
 
 CORRECT extraction:
-- Do NOT create an entity for TÜV SÜD (it's a certification body, not a standard)
-- Or if relevant, note it as context but not as a Standard node
+- Entity: Organization (name: "tüv süd", organization_type: "certification_body")
 
-**Rule**: These are certification ORGANIZATIONS, not standards:
-- ✗ TÜV SÜD, TÜV Rheinland, TÜV Nord (German certification bodies)
-- ✗ UL (Underwriters Laboratories)
-- ✗ SGS, Bureau Veritas, Intertek (testing companies)
-- ✗ FDA, FAA, EASA (regulatory agencies - they ENFORCE standards, they ARE NOT standards)
+**Rule**: These are ORGANIZATIONS, not Standards — extract them as Organization:
+- ✓ TÜV SÜD, TÜV Rheinland, TÜV Nord → Organization (certification_body)
+- ✓ UL (Underwriters Laboratories) → Organization (certification_body)
+- ✓ SGS, Bureau Veritas, Intertek → Organization (certification_body)
+- ✓ FDA, FAA, EASA → Organization (regulatory_agency)
+- ✓ ISO, IEC, IEEE, RTCA, SAE → Organization (standards_body)
+- ✓ Jama Software, Siemens, IBM → Organization (vendor)
+- ✓ NASA, INCOSE, PMI → Organization (professional_society)
 
 Standards have alphanumeric designations like: ISO 26262, DO-178C, IEC 62304, IEEE 830
+
+### Example: Organization PUBLISHES Standard
+Text: "RTCA publishes DO-178C, the primary safety standard for airborne software."
+
+Extract:
+- Entity: Organization (name: "rtca", organization_type: "standards_body")
+- Entity: Standard (name: "do-178c", organization: "RTCA")
+- Relationship: (rtca)-[PUBLISHES]->(do-178c)
 
 ### ✗ WRONG: Standard -[APPLIES_TO]-> Concept
 Text: "ISO/IEC 12207 covers systems and software engineering lifecycle processes."
@@ -187,14 +197,16 @@ CORRECT extraction:
 
 Use DEFINES when a standard defines or specifies a concept.
 
-### 5. Challenge Classification (IMPORTANT!)
+### 5. Challenge vs Outcome Classification (IMPORTANT!)
 - **Challenge** = ONLY obstacles, difficulties, problems, risks that need to be overcome
   - ✓ scope creep, requirements volatility, incomplete traceability, late defect discovery
-- **NEVER classify these as Challenge:**
-  - ✗ Positive outcomes, goals, product qualities, or desirable states
-  - ✗ "High-Quality Products" → NOT a Challenge (it's a goal/outcome)
-  - ✗ "Customer Satisfaction" → NOT a Challenge (it's a goal)
-  - ✗ "Reduced Time-to-Market" → NOT a Challenge (it's a benefit)
+- **Outcome** = Positive results, benefits, goals achieved through good practices
+  - ✓ improved product quality, reduced time-to-market, regulatory compliance
+  - ✓ customer satisfaction, cost reduction, faster development cycles
+- **NEVER classify positive outcomes as Challenge:**
+  - ✗ "High-Quality Products" → NOT a Challenge → use Outcome
+  - ✗ "Customer Satisfaction" → NOT a Challenge → use Outcome
+  - ✗ "Reduced Time-to-Market" → NOT a Challenge → use Outcome
 
 ### 6. Definition Extraction (CRITICAL!)
 - ALWAYS include definitions: When the text contains a definition, explanation,
@@ -465,13 +477,19 @@ def get_few_shot_examples() -> list[dict]:
                 },
             ],
         },
-        # Example 5: Positive outcome is NOT a Challenge (borderline case)
+        # Example 5: Outcome (positive result, NOT a Challenge)
         {
             "text": (
                 "Achieving high-quality products requires establishing strong "
                 "requirements management practices early in the development lifecycle."
             ),
             "entities": [
+                {
+                    "type": "Outcome",
+                    "name": "high-quality products",
+                    "display_name": "High-Quality Products",
+                    "outcome_type": "quality",
+                },
                 {
                     "type": "Concept",
                     "name": "requirements management",
@@ -481,11 +499,13 @@ def get_few_shot_examples() -> list[dict]:
                     ),
                 },
             ],
-            "relationships": [],
-            "_note": (
-                "high-quality products is a GOAL, not a Challenge. "
-                "Do not create Challenge entities for positive outcomes."
-            ),
+            "relationships": [
+                {
+                    "source": "requirements management",
+                    "type": "ACHIEVES",
+                    "target": "high-quality products",
+                },
+            ],
         },
         # Example 6: ProcessStage + PREREQUISITE_FOR
         {
@@ -557,6 +577,39 @@ def get_few_shot_examples() -> list[dict]:
                     "target": "functional safety level",
                 },
                 {"source": "iso 26262", "type": "APPLIES_TO", "target": "automotive"},
+            ],
+        },
+        # Example 8: Organization + PUBLISHES + REGULATES
+        {
+            "text": (
+                "The FDA regulates the medical device industry and enforces "
+                "compliance with IEC 62304 for software lifecycle processes."
+            ),
+            "entities": [
+                {
+                    "type": "Organization",
+                    "name": "fda",
+                    "display_name": "FDA",
+                    "organization_type": "regulatory_agency",
+                    "abbreviation": "FDA",
+                },
+                {
+                    "type": "Industry",
+                    "name": "medical devices",
+                    "display_name": "Medical Devices",
+                    "regulated": True,
+                },
+                {
+                    "type": "Standard",
+                    "name": "iec 62304",
+                    "display_name": "IEC 62304",
+                    "organization": "IEC",
+                    "domain": "medical",
+                },
+            ],
+            "relationships": [
+                {"source": "fda", "type": "REGULATES", "target": "medical devices"},
+                {"source": "iec 62304", "type": "APPLIES_TO", "target": "medical devices"},
             ],
         },
     ]

@@ -86,11 +86,13 @@ class EntityNormalizer:
     # framing-dependent and most often misclassifications.
     LABEL_PRIORITY: ClassVar[list[str]] = [
         "Standard",
+        "Organization",
         "Tool",
         "Industry",
         "Role",
         "Methodology",
         "Concept",
+        "Outcome",
         "Artifact",
         "Processstage",
         "Bestpractice",
@@ -121,6 +123,8 @@ class EntityNormalizer:
             "Tool",
             "Methodology",
             "Industry",
+            "Organization",
+            "Outcome",
         ]
 
     async def normalize_all_entities(self) -> dict:
@@ -587,7 +591,8 @@ async def get_entity_name_stats(driver: "AsyncDriver", database: str = "neo4j") 
     MATCH (n)
     WHERE any(label IN labels(n) WHERE label IN
         ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-         'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+         'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+         'Organization', 'Outcome'])
     WITH labels(n)[0] AS label,
          n.name AS name,
          CASE WHEN n.name = toLower(trim(n.name)) THEN 1 ELSE 0 END AS is_normalized

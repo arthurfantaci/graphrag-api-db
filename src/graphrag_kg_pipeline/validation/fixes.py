@@ -394,7 +394,8 @@ async def fix_missing_definitions(
     MATCH (e)
     WHERE any(lbl IN labels(e) WHERE lbl IN
         ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-         'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+         'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+         'Organization', 'Outcome'])
     AND (e.definition IS NULL OR e.definition = '')
     RETURN count(e) AS missing_count
     """
@@ -412,7 +413,8 @@ async def fix_missing_definitions(
     MATCH (e), (d:Definition)
     WHERE any(lbl IN labels(e) WHERE lbl IN
         ['Concept', 'Challenge', 'Artifact', 'Bestpractice', 'Processstage',
-         'Role', 'Standard', 'Tool', 'Methodology', 'Industry'])
+         'Role', 'Standard', 'Tool', 'Methodology', 'Industry',
+         'Organization', 'Outcome'])
     AND (e.definition IS NULL OR e.definition = '')
     AND d.definition IS NOT NULL
     AND toLower(e.name) = toLower(d.term)

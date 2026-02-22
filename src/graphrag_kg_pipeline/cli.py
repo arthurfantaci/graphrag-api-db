@@ -98,6 +98,16 @@ Run the complete neo4j_graphrag pipeline:
     )
 
     scrape_parser.add_argument(
+        "--full",
+        action="store_true",
+        help=(
+            "Run all pipeline stages in a single invocation: scrape → extract → "
+            "chunk repair → entity creation → cleanup → enrichment → graph analysis → "
+            "supplementary → validate + fix → report"
+        ),
+    )
+
+    scrape_parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Estimate costs and show what would be processed without running",
@@ -296,6 +306,20 @@ def _run_scrape_command(args: argparse.Namespace) -> None:
         console.print("Pipeline stages:")
         console.print("  1. Scrape articles + glossary")
         console.print("  2. Save JSON/JSONL output")
+    elif args.full:
+        console.print("Mode: [bold green]Full pipeline[/] (all stages + fixes)")
+        console.print()
+        console.print("Pipeline stages:")
+        console.print("  1. Scrape articles + glossary")
+        console.print("  2. Process through SimpleKGPipeline")
+        console.print("  3. Chunk repair (degenerate, index, chunk_ids)")
+        console.print("  4. Entity creation (backfill, LangExtract)")
+        console.print("  5. Entity cleanup (normalize, dedup, consolidate)")
+        console.print("  6. Entity enrichment (summarize, definitions)")
+        console.print("  7. Graph analysis (Leiden, communities, embeddings)")
+        if not args.skip_supplementary:
+            console.print("  8. Supplementary structure (chapters, resources)")
+        console.print("  9. Validate + fix + re-validate + report")
     else:
         console.print("Pipeline stages:")
         console.print("  1. Scrape articles + glossary")
@@ -317,8 +341,11 @@ def _run_scrape_command(args: argparse.Namespace) -> None:
         console.print("  - Embedding cost: ~$0.10 (Voyage AI) or ~$0.50 (OpenAI)")
         console.print("  - LLM extraction cost: ~$5-10 (gpt-4o, 2 gleaning passes)")
         console.print("  - Entity summarization: ~$1-2 (gpt-4o)")
+        console.print("  - LangExtract augmentation: ~$2-4 (gpt-4o)")
         console.print("  - Community summaries: ~$0.10 (gpt-4o-mini)")
-        console.print("  - Estimated total: ~$7-13")
+        if args.full:
+            console.print("  - Validation + fixes: ~10 seconds (Cypher only)")
+        console.print("  - Estimated total: ~$9-17")
         console.print("  - Estimated time: ~1.5 hours")
         return
 
@@ -330,7 +357,8 @@ def _run_scrape_command(args: argparse.Namespace) -> None:
                 scrape_only=args.scrape_only,
                 skip_resources=args.skip_resources,
                 skip_supplementary=args.skip_supplementary,
-                run_validation=args.validate,
+                run_validation=args.validate or args.full,
+                run_full=args.full,
             )
         )
     except PlaywrightNotAvailableError:
@@ -406,6 +434,7 @@ Required environment variables:
             args.skip_supplementary = False
             args.scrape_only = False
             args.dry_run = False
+            args.full = False
         _run_scrape_command(args)
     elif args.command == "validate":
         try:

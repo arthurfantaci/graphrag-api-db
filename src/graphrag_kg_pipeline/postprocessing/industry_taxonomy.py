@@ -182,6 +182,42 @@ CONCEPTS_NOT_INDUSTRIES: set[str] = {
 }
 
 # =============================================================================
+# ORGANIZATIONS MISLABELED AS INDUSTRIES
+# =============================================================================
+# These are organizations that the LLM may extract as Industry nodes.
+# They should be relabeled as Organization during consolidation.
+
+ORGANIZATIONS_NOT_INDUSTRIES: set[str] = {
+    # Standards bodies
+    "iso",
+    "iec",
+    "ieee",
+    "rtca",
+    "sae",
+    "ecss",
+    "cenelec",
+    "incose",
+    # Regulatory agencies
+    "fda",
+    "faa",
+    "easa",
+    # Certification bodies
+    "tüv süd",
+    "tuv sud",
+    "tüv rheinland",
+    "ul",
+    "sgs",
+    "bureau veritas",
+    "intertek",
+    # Professional societies / other organizations
+    "nasa",
+    "pmi",
+    "jama software",
+    "nikola",
+    "finnish red cross",
+}
+
+# =============================================================================
 # GENERIC TERMS TO DELETE
 # =============================================================================
 # These are too vague to be useful as Industry nodes
@@ -199,7 +235,6 @@ GENERIC_TERMS_TO_DELETE: set[str] = {
     "other industries",
     "smbs",
     "ffrdc",
-    "humanitarian organization",
 }
 
 # Canonical list of industries
@@ -216,6 +251,7 @@ def classify_industry_term(raw_name: str) -> tuple[str, str | None]:
         Tuple of (action, value) where action is one of:
         - ("keep", canonical_name): Valid industry, normalize to canonical
         - ("reclassify", None): Should be reclassified as Concept
+        - ("reclassify_org", None): Should be reclassified as Organization
         - ("delete", None): Too generic, should be deleted
         - ("unknown", None): Could not classify
     """
@@ -223,6 +259,10 @@ def classify_industry_term(raw_name: str) -> tuple[str, str | None]:
         return ("delete", None)
 
     normalized = raw_name.lower().strip()
+
+    # Check if it's an organization that was misclassified
+    if normalized in ORGANIZATIONS_NOT_INDUSTRIES:
+        return ("reclassify_org", None)
 
     # Check if it's a concept that was misclassified
     if normalized in CONCEPTS_NOT_INDUSTRIES:
@@ -391,6 +431,7 @@ class IndustryNormalizer:
 
         # Classify each industry
         to_reclassify = []
+        to_reclassify_org = []
         to_delete = []
         canonical_groups: dict[str, list[dict]] = {}
         unknown = []
@@ -401,6 +442,8 @@ class IndustryNormalizer:
 
             if action == "reclassify":
                 to_reclassify.append(industry)
+            elif action == "reclassify_org":
+                to_reclassify_org.append(industry)
             elif action == "delete":
                 to_delete.append(industry)
             elif action == "keep" and canonical:
@@ -410,7 +453,7 @@ class IndustryNormalizer:
             else:
                 unknown.append(industry)
 
-        # Step 1: Reclassify concepts
+        # Step 1a: Reclassify concepts
         for industry in to_reclassify:
             try:
                 await self._reclassify_to_concept(industry["element_id"])
@@ -419,6 +462,19 @@ class IndustryNormalizer:
             except Exception as e:
                 logger.error(
                     "Failed to reclassify",
+                    name=industry["name"],
+                    error=str(e),
+                )
+
+        # Step 1b: Reclassify organizations
+        for industry in to_reclassify_org:
+            try:
+                await self._reclassify_to_organization(industry["element_id"])
+                stats["reclassified"] += 1
+                logger.debug("Reclassified to Organization", name=industry["name"])
+            except Exception as e:
+                logger.error(
+                    "Failed to reclassify to Organization",
                     name=industry["name"],
                     error=str(e),
                 )
@@ -545,6 +601,55 @@ class IndustryNormalizer:
             summary = await result.consume()
 
             # If no nodes were modified, merge with existing Concept
+            if summary.counters.labels_added == 0:
+                await session.run(merge_query, element_id=element_id)
+
+    async def _reclassify_to_organization(self, element_id: str) -> None:
+        """Reclassify an Industry node to an Organization node.
+
+        Args:
+            element_id: Element ID of the Industry node.
+        """
+        query = """
+        MATCH (i:Industry) WHERE elementId(i) = $element_id
+        // Check if an Organization with the same name exists
+        OPTIONAL MATCH (existing:Organization {name: i.name})
+        WITH i, existing
+        WHERE existing IS NULL
+        // Add Organization label, remove Industry label
+        SET i:Organization
+        REMOVE i:Industry
+        """
+
+        merge_query = """
+        MATCH (i:Industry) WHERE elementId(i) = $element_id
+        MATCH (existing:Organization {name: i.name})
+        // Transfer relationships to existing Organization
+        CALL (i, existing) {
+            MATCH (i)-[r]->()
+            WITH i, existing, r, endNode(r) AS target, type(r) AS rel_type
+            CALL apoc.merge.relationship(existing, rel_type, {}, properties(r), target, {})
+            YIELD rel
+            DELETE r
+            RETURN count(*) AS out_count
+        }
+        CALL (i, existing) {
+            MATCH ()-[r]->(i)
+            WITH i, existing, r, startNode(r) AS source, type(r) AS rel_type
+            CALL apoc.merge.relationship(source, rel_type, {}, properties(r), existing, {})
+            YIELD rel
+            DELETE r
+            RETURN count(*) AS in_count
+        }
+        DELETE i
+        """
+
+        async with self.driver.session(database=self.database) as session:
+            # First try to just relabel
+            result = await session.run(query, element_id=element_id)
+            summary = await result.consume()
+
+            # If no nodes were modified, merge with existing Organization
             if summary.counters.labels_added == 0:
                 await session.run(merge_query, element_id=element_id)
 

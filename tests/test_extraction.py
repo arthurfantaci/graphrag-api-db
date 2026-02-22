@@ -275,7 +275,7 @@ class TestPromptQualityImprovements:
             REQUIREMENTS_DOMAIN_INSTRUCTIONS,
         )
 
-        assert "Challenge Classification" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
+        assert "Challenge vs Outcome Classification" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
         assert "NEVER classify" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
         assert "High-Quality Products" in REQUIREMENTS_DOMAIN_INSTRUCTIONS
 

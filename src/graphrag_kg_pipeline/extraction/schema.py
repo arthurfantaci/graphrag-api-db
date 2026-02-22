@@ -1,9 +1,9 @@
 """Knowledge graph schema for requirements management domain.
 
 This module defines the complete schema for entity and relationship extraction:
-- 10 node types (Concept, Challenge, Artifact, etc.)
-- 10 relationship types (ADDRESSES, REQUIRES, etc.)
-- ~30 patterns constraining valid (source, rel, target) triples
+- 12 node types (Concept, Challenge, Artifact, Organization, Outcome, etc.)
+- 14 relationship types (ADDRESSES, REQUIRES, PUBLISHES, ACHIEVES, etc.)
+- ~50 patterns constraining valid (source, rel, target) triples
 
 The schema is designed for neo4j_graphrag's SimpleKGPipeline.
 """
@@ -29,6 +29,8 @@ LLM_EXTRACTED_ENTITY_LABELS: frozenset[str] = frozenset(
         "Tool",
         "Methodology",
         "Industry",
+        "Organization",
+        "Outcome",
     }
 )
 
@@ -291,7 +293,8 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
             "ONLY use for actual industries like: aerospace, automotive, "
             "medical devices, defense, industrial equipment, energy. "
             "NOTE: AI/ML, IoT, software, digital transformation are "
-            "Concepts, NOT Industries."
+            "Concepts, NOT Industries. "
+            "NOTE: NASA, FDA, IEEE are Organizations, NOT Industries."
         ),
         "properties": {
             "name": {
@@ -308,6 +311,68 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
                 "type": "BOOLEAN",
                 "required": False,
                 "description": "Whether this industry is heavily regulated",
+            },
+        },
+    },
+    "Organization": {
+        "label": "Organization",
+        "description": (
+            "A named organization, agency, standards body, or company. "
+            "Examples: NASA, INCOSE, IEEE, FDA, FAA, EASA, RTCA, "
+            "Jama Software, TUV SUD, ISO (the organization). "
+            "NOTE: Use Standard for the standards themselves (ISO 26262), "
+            "use Organization for the issuing body (ISO)."
+        ),
+        "properties": {
+            "name": {
+                "type": "STRING",
+                "required": True,
+                "description": "Lowercase normalized name (e.g., 'nasa', 'ieee')",
+            },
+            "display_name": {
+                "type": "STRING",
+                "required": False,
+                "description": "Official name with proper casing",
+            },
+            "organization_type": {
+                "type": "STRING",
+                "required": False,
+                "description": (
+                    "Type: standards_body, regulatory_agency, "
+                    "professional_society, vendor, certification_body"
+                ),
+            },
+            "abbreviation": {
+                "type": "STRING",
+                "required": False,
+                "description": "Common abbreviation (e.g., 'NASA', 'FDA')",
+            },
+        },
+    },
+    "Outcome": {
+        "label": "Outcome",
+        "description": (
+            "A positive result, benefit, or goal achieved through good practices. "
+            "Examples: improved product quality, reduced time-to-market, "
+            "regulatory compliance, customer satisfaction, cost reduction. "
+            "NOTE: Use Challenge for problems/obstacles, use Outcome for "
+            "positive results and goals."
+        ),
+        "properties": {
+            "name": {
+                "type": "STRING",
+                "required": True,
+                "description": "Lowercase normalized name",
+            },
+            "display_name": {
+                "type": "STRING",
+                "required": False,
+                "description": "Original casing for display",
+            },
+            "outcome_type": {
+                "type": "STRING",
+                "required": False,
+                "description": "Classification: quality, efficiency, compliance, cost",
             },
         },
     },
@@ -411,6 +476,38 @@ RELATIONSHIP_TYPES: dict[str, dict[str, Any]] = {
         ),
         "properties": {},
     },
+    "PUBLISHES": {
+        "type": "PUBLISHES",
+        "description": (
+            "An organization publishes, issues, or maintains a standard. "
+            "Example: (ISO)-[PUBLISHES]->(ISO 26262)"
+        ),
+        "properties": {},
+    },
+    "REGULATES": {
+        "type": "REGULATES",
+        "description": (
+            "An organization regulates or has authority over an industry. "
+            "Example: (FDA)-[REGULATES]->(medical devices)"
+        ),
+        "properties": {},
+    },
+    "DEVELOPS": {
+        "type": "DEVELOPS",
+        "description": (
+            "An organization develops or provides a tool. "
+            "Example: (Jama Software)-[DEVELOPS]->(Jama Connect)"
+        ),
+        "properties": {},
+    },
+    "ACHIEVES": {
+        "type": "ACHIEVES",
+        "description": (
+            "A concept, best practice, or methodology achieves a positive outcome. "
+            "Example: (requirements traceability)-[ACHIEVES]->(regulatory compliance)"
+        ),
+        "properties": {},
+    },
 }
 
 
@@ -424,12 +521,17 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("Bestpractice", "ADDRESSES", "Challenge"),
     ("Tool", "ADDRESSES", "Challenge"),
     ("Methodology", "ADDRESSES", "Challenge"),
+    ("Concept", "ADDRESSES", "Concept"),
     # REQUIRES patterns
     ("Concept", "REQUIRES", "Concept"),
     ("Concept", "REQUIRES", "Artifact"),
     ("Bestpractice", "REQUIRES", "Concept"),
     ("Processstage", "REQUIRES", "Artifact"),
     ("Tool", "REQUIRES", "Concept"),
+    ("Standard", "REQUIRES", "Concept"),
+    ("Standard", "REQUIRES", "Artifact"),
+    ("Methodology", "REQUIRES", "Concept"),
+    ("Methodology", "REQUIRES", "Artifact"),
     # COMPONENT_OF patterns
     ("Artifact", "COMPONENT_OF", "Artifact"),
     ("Concept", "COMPONENT_OF", "Concept"),
@@ -437,9 +539,16 @@ PATTERNS: list[tuple[str, str, str]] = [
     # RELATED_TO patterns (broader applicability)
     ("Concept", "RELATED_TO", "Concept"),
     ("Challenge", "RELATED_TO", "Challenge"),
+    ("Challenge", "RELATED_TO", "Concept"),
     ("Artifact", "RELATED_TO", "Artifact"),
     ("Standard", "RELATED_TO", "Standard"),
     ("Bestpractice", "RELATED_TO", "Concept"),
+    ("Role", "RELATED_TO", "Concept"),
+    ("Role", "RELATED_TO", "Role"),
+    ("Tool", "RELATED_TO", "Concept"),
+    ("Tool", "RELATED_TO", "Tool"),
+    ("Organization", "RELATED_TO", "Organization"),
+    ("Outcome", "RELATED_TO", "Outcome"),
     # ALTERNATIVE_TO patterns
     ("Methodology", "ALTERNATIVE_TO", "Methodology"),
     ("Tool", "ALTERNATIVE_TO", "Tool"),
@@ -454,6 +563,7 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("Methodology", "APPLIES_TO", "Industry"),
     ("Bestpractice", "APPLIES_TO", "Processstage"),
     ("Concept", "APPLIES_TO", "Processstage"),
+    ("Organization", "APPLIES_TO", "Industry"),
     # PRODUCES patterns
     ("Processstage", "PRODUCES", "Artifact"),
     ("Role", "PRODUCES", "Artifact"),
@@ -464,6 +574,17 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("Processstage", "PREREQUISITE_FOR", "Processstage"),
     ("Artifact", "PREREQUISITE_FOR", "Processstage"),
     ("Concept", "PREREQUISITE_FOR", "Concept"),
+    # PUBLISHES patterns (Organization → Standard)
+    ("Organization", "PUBLISHES", "Standard"),
+    # REGULATES patterns (Organization → Industry)
+    ("Organization", "REGULATES", "Industry"),
+    # DEVELOPS patterns (Organization → Tool)
+    ("Organization", "DEVELOPS", "Tool"),
+    # ACHIEVES patterns (practices → positive outcomes)
+    ("Concept", "ACHIEVES", "Outcome"),
+    ("Bestpractice", "ACHIEVES", "Outcome"),
+    ("Methodology", "ACHIEVES", "Outcome"),
+    ("Tool", "ACHIEVES", "Outcome"),
 ]
 
 

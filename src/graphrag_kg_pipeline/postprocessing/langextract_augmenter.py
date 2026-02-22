@@ -28,6 +28,8 @@ _EXTRACTION_CLASSES: list[str] = [
     "Tool",
     "Methodology",
     "Industry",
+    "Organization",
+    "Outcome",
 ]
 
 
@@ -92,7 +94,8 @@ class LangExtractAugmenter:
         prompt = (
             "Extract entities from this requirements management text. "
             "Entity types: Concept, Challenge, Artifact, Bestpractice, "
-            "Processstage, Role, Standard, Tool, Methodology, Industry. "
+            "Processstage, Role, Standard, Tool, Methodology, Industry, "
+            "Organization, Outcome. "
             "Use exact text from the input. Extract in order of appearance."
         )
         examples = self._build_examples()
@@ -276,7 +279,7 @@ class LangExtractAugmenter:
 
         query = f"""
             MERGE (n:{label} {{name: $name}})
-            ON CREATE SET n += $props
+            ON CREATE SET n += $props, n:__Entity__:__KGBuilder__
             WITH n
             MATCH (c:Chunk) WHERE elementId(c) = $chunk_id
             MERGE (n)-[:MENTIONED_IN]->(c)
