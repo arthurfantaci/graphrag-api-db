@@ -9,6 +9,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import structlog
+import tenacity
+
+from graphrag_kg_pipeline.utils.retry import openai_retry
 
 if TYPE_CHECKING:
     from neo4j import AsyncDriver
@@ -47,11 +50,14 @@ class CommunitySummarizer:
             model: LLM model for summarization.
             min_community_size: Skip communities smaller than this.
         """
+        from openai import AsyncOpenAI
+
         self.driver = driver
         self.database = database
         self.openai_api_key = openai_api_key
         self.model = model
         self.min_community_size = min_community_size
+        self._client = AsyncOpenAI(api_key=openai_api_key)
 
     async def summarize_communities(self) -> dict[str, Any]:
         """Generate summaries for all communities.
@@ -62,10 +68,6 @@ class CommunitySummarizer:
         Returns:
             Statistics dict with communities_summarized and skipped counts.
         """
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(api_key=self.openai_api_key)
-
         communities = await self._get_communities()
         summarized = 0
         skipped = 0
@@ -91,17 +93,18 @@ class CommunitySummarizer:
             )
 
             try:
-                response = await client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0,
-                    max_tokens=200,
-                )
+                response = await self._call_openai(prompt)
                 summary = response.choices[0].message.content.strip()
 
                 await self._create_community_node(community_id, summary, members)
                 summarized += 1
 
+            except tenacity.RetryError:
+                logger.warning(
+                    "API rate limit exhausted after retries",
+                    community_id=community_id,
+                    exc_info=True,
+                )
             except Exception:
                 logger.warning(
                     "Failed to summarize community",
@@ -115,6 +118,23 @@ class CommunitySummarizer:
             skipped=skipped,
         )
         return {"communities_summarized": summarized, "communities_skipped": skipped}
+
+    @openai_retry
+    async def _call_openai(self, prompt: str) -> Any:
+        """Call the OpenAI API with retry logic.
+
+        Args:
+            prompt: The prompt to send.
+
+        Returns:
+            The OpenAI chat completion response.
+        """
+        return await self._client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=200,
+        )
 
     async def _get_communities(self) -> dict[int, list[dict[str, str]]]:
         """Query Neo4j for community assignments.

@@ -13,6 +13,9 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
+import tenacity
+
+from graphrag_kg_pipeline.utils.retry import openai_retry
 
 if TYPE_CHECKING:
     from neo4j import AsyncDriver
@@ -61,10 +64,13 @@ class EntitySummarizer:
             openai_api_key: OpenAI API key.
             model: LLM model for summarization (default: gpt-4o for quality).
         """
+        from openai import AsyncOpenAI
+
         self.driver = driver
         self.database = database
         self.openai_api_key = openai_api_key
         self.model = model
+        self._client = AsyncOpenAI(api_key=openai_api_key)
 
     async def find_entities_with_fragments(self) -> list[dict[str, Any]]:
         """Find entities that have description stored as a JSON array.
@@ -127,10 +133,6 @@ class EntitySummarizer:
             logger.info("No entities with fragmented descriptions found")
             return stats
 
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(api_key=self.openai_api_key)
-
         for entity in entities:
             try:
                 # Parse description fragments
@@ -148,12 +150,7 @@ class EntitySummarizer:
                     descriptions=descriptions_text,
                 )
 
-                response = await client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0,
-                    max_tokens=300,
-                )
+                response = await self._call_openai(prompt)
 
                 summary = (response.choices[0].message.content or "").strip()
 
@@ -164,6 +161,13 @@ class EntitySummarizer:
                     )
                     stats["entities_summarized"] += 1
 
+            except tenacity.RetryError:
+                stats["errors"] += 1
+                logger.warning(
+                    "API rate limit exhausted after retries",
+                    entity_name=entity["name"],
+                    exc_info=True,
+                )
             except Exception:
                 stats["errors"] += 1
                 logger.warning(
@@ -179,6 +183,23 @@ class EntitySummarizer:
         )
 
         return stats
+
+    @openai_retry
+    async def _call_openai(self, prompt: str) -> Any:
+        """Call the OpenAI API with retry logic.
+
+        Args:
+            prompt: The prompt to send.
+
+        Returns:
+            The OpenAI chat completion response.
+        """
+        return await self._client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=300,
+        )
 
     def _parse_fragments(self, description: str) -> list[str]:
         """Parse description into fragments.

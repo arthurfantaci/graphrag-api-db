@@ -12,6 +12,9 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
+import tenacity
+
+from graphrag_kg_pipeline.utils.retry import openai_retry
 
 if TYPE_CHECKING:
     from neo4j import AsyncDriver
@@ -66,10 +69,13 @@ class ExtractionGleaner:
             openai_api_key: OpenAI API key.
             model: LLM model for gleaning (default: same as primary extraction).
         """
+        from openai import AsyncOpenAI
+
         self.driver = driver
         self.database = database
         self.openai_api_key = openai_api_key
         self.model = model
+        self._client = AsyncOpenAI(api_key=openai_api_key)
 
     async def glean_article(self, article_id: str) -> dict[str, Any]:
         """Run gleaning pass for all chunks of an article.
@@ -89,10 +95,6 @@ class ExtractionGleaner:
             logger.info("No chunks found for gleaning", article_id=article_id)
             return stats
 
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(api_key=self.openai_api_key)
-
         for chunk_data in chunks_with_entities:
             try:
                 chunk_text = chunk_data["text"]
@@ -106,13 +108,7 @@ class ExtractionGleaner:
                     chunk_text=chunk_text,
                 )
 
-                response = await client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0,
-                    max_tokens=2000,
-                    response_format={"type": "json_object"},
-                )
+                response = await self._call_openai(prompt)
 
                 content = response.choices[0].message.content or "{}"
                 # Strip markdown code fences if present (fallback)
@@ -144,6 +140,13 @@ class ExtractionGleaner:
                     article_id=article_id,
                     exc_info=True,
                 )
+            except tenacity.RetryError:
+                stats["errors"] += 1
+                logger.warning(
+                    "API rate limit exhausted after retries",
+                    article_id=article_id,
+                    exc_info=True,
+                )
             except Exception:
                 stats["errors"] += 1
                 logger.warning(
@@ -161,6 +164,24 @@ class ExtractionGleaner:
         )
 
         return stats
+
+    @openai_retry
+    async def _call_openai(self, prompt: str) -> Any:
+        """Call the OpenAI API with retry logic.
+
+        Args:
+            prompt: The prompt to send.
+
+        Returns:
+            The OpenAI chat completion response.
+        """
+        return await self._client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=2000,
+            response_format={"type": "json_object"},
+        )
 
     async def _get_chunks_with_entities(self, article_id: str) -> list[dict[str, Any]]:
         """Query chunks and their linked entities for an article.

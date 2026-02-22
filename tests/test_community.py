@@ -6,7 +6,7 @@ Neo4j driver, using real igraph/leidenalg for community detection.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -136,10 +136,7 @@ class TestCommunitySummarizer:
             }
         )
 
-        # Mock the OpenAI client import inside summarize_communities
-        mock_client = AsyncMock()
-        with patch("openai.AsyncOpenAI", return_value=mock_client):
-            stats = await summarizer.summarize_communities()
+        stats = await summarizer.summarize_communities()
 
         assert stats["communities_summarized"] == 0
         assert stats["communities_skipped"] == 1
@@ -171,18 +168,15 @@ class TestCommunitySummarizer:
         )
         summarizer._create_community_node = AsyncMock()
 
-        # Mock OpenAI response
+        # Mock the retry-decorated _call_openai helper
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[
             0
         ].message.content = "This community covers requirements traceability."
+        summarizer._call_openai = AsyncMock(return_value=mock_response)
 
-        mock_client = AsyncMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
-
-        with patch("openai.AsyncOpenAI", return_value=mock_client):
-            stats = await summarizer.summarize_communities()
+        stats = await summarizer.summarize_communities()
 
         assert stats["communities_summarized"] == 1
         summarizer._create_community_node.assert_called_once()
