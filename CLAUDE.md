@@ -69,6 +69,12 @@ uv run ty check src/         # Type check
 uv run python examples/validate_toc_discovery.py
 ```
 
+## Conventions
+
+- Conventional commits: `fix:`, `feat:`, `refactor:`, `docs:`
+- Git workflow: Issue → Branch → PR
+- **CLAUDE.md & memory files — NO separate workflow**: Changes that ONLY touch `CLAUDE.md` or `~/.claude/` memory files MUST NOT get their own issue, branch, or PR. Bundle them into the next phase's PR, or commit directly to the working branch. See global CLAUDE.md for full rule.
+
 ## Code Style Standards
 
 This project uses strict Python standards enforced by Ruff and ty:
