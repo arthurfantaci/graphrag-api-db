@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" modified="2026-02-21T00:00:00.000Z" agent="GraphRAG Pipeline" etag="arch-v1" version="24.0.0" type="device" compressed="false">
+<mxfile host="app.diagrams.net" modified="2026-02-24T00:00:00.000Z" agent="GraphRAG Pipeline" etag="arch-v2" version="24.0.0" type="device" compressed="false">
   <diagram id="pipeline-architecture" name="Pipeline Architecture">
     <mxGraphModel dx="1100" dy="1350" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="1350" math="0" shadow="0">
       <root>
@@ -58,7 +58,7 @@
         <mxCell id="25" value="LLMEntityRelExtractor" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffffff;strokeColor=#82b366;shadow=0;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="655" y="340" width="210" height="44" as="geometry"/>
         </mxCell>
-        <mxCell id="26" value="Gleaning (2-pass LLM) &#x2022; Schema: 10 nodes, 10 rels &#x2022; Voyage AI voyage-4 embeddings (1024d)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#666666;fontStyle=2;" vertex="1" parent="1">
+        <mxCell id="26" value="Gleaning (2-pass LLM) &#x2022; Schema: 12 nodes, 14 rels &#x2022; Voyage AI voyage-4 embeddings (1024d)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#666666;fontStyle=2;" vertex="1" parent="1">
           <mxGeometry x="115" y="400" width="740" height="25" as="geometry"/>
         </mxCell>
         <mxCell id="27" value="OpenAI text-embedding-3-small fallback when VOYAGE_API_KEY not set" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#999999;fontStyle=2;" vertex="1" parent="1">
@@ -69,42 +69,67 @@
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- Stage 3: NORMALIZE (Yellow/Orange)                     -->
+        <!-- Stage 3: NORMALIZE — 3-Phase (Yellow/Orange)           -->
         <!-- ═══════════════════════════════════════════════════════ -->
-        <mxCell id="30" value="Stage 3: NORMALIZE — Entity Post-Processing" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingTop=5;spacingLeft=12;fontSize=14;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;arcSize=6;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="80" y="520" width="940" height="290" as="geometry"/>
+        <mxCell id="30" value="Stage 3: NORMALIZE — 3-Phase Entity Post-Processing" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingTop=5;spacingLeft=12;fontSize=14;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;arcSize=6;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="520" width="940" height="380" as="geometry"/>
         </mxCell>
-        <!-- Left column: steps 1–5 -->
-        <mxCell id="31" value="1. EntityNormalizer — lowercase + trim" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="115" y="575" width="390" height="34" as="geometry"/>
+        <!-- Phase A — Entity Creation -->
+        <mxCell id="70" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;strokeWidth=0.5;dashed=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="100" y="558" width="900" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="32" value="2. EntityNormalizer — deduplicate by name" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="115" y="617" width="390" height="34" as="geometry"/>
+        <mxCell id="71" value="Phase A — Entity Creation" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=3;fontColor=#8B7500;" vertex="1" parent="1">
+          <mxGeometry x="110" y="558" width="300" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="33" value="3. EntityCleanupNormalizer — generics + plurals" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="115" y="659" width="390" height="34" as="geometry"/>
+        <mxCell id="72" value="1. MentionedInBackfiller — MENTIONED_IN + APPLIES_TO" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="115" y="582" width="425" height="34" as="geometry"/>
         </mxCell>
-        <mxCell id="34" value="4. IndustryNormalizer — 100+ → 18 industries" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="115" y="701" width="390" height="34" as="geometry"/>
+        <mxCell id="73" value="2. LangExtractAugmenter — source grounding" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="555" y="582" width="425" height="34" as="geometry"/>
         </mxCell>
-        <mxCell id="35" value="5. MentionedInBackfiller — MENTIONED_IN + APPLIES_TO" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="115" y="743" width="390" height="34" as="geometry"/>
+        <!-- Phase B — Entity Cleanup -->
+        <mxCell id="74" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff6e0;strokeColor=#d6b656;strokeWidth=0.5;dashed=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="100" y="642" width="900" height="130" as="geometry"/>
         </mxCell>
-        <!-- Right column: steps 6–10 -->
-        <mxCell id="36" value="6. EntitySummarizer — LLM entity descriptions" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="545" y="575" width="390" height="34" as="geometry"/>
+        <mxCell id="75" value="Phase B — Entity Cleanup" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=3;fontColor=#8B7500;" vertex="1" parent="1">
+          <mxGeometry x="110" y="642" width="300" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="37" value="7. LangExtractAugmenter — source grounding" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="545" y="617" width="390" height="34" as="geometry"/>
+        <mxCell id="76" value="3. EntityNormalizer — lowercase + trim" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="115" y="666" width="425" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="38" value="8. CommunityDetector — Leiden clustering" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="545" y="659" width="390" height="34" as="geometry"/>
+        <mxCell id="77" value="4. EntityNormalizer — deduplicate by name" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="115" y="700" width="425" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="39" value="9. CommunitySummarizer — LLM community summaries" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="545" y="701" width="390" height="34" as="geometry"/>
+        <mxCell id="78" value="5. EntityNormalizer — deduplicate cross-label" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="115" y="734" width="425" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="40" value="10. CommunityEmbedder — Voyage AI community vectors" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="545" y="743" width="390" height="34" as="geometry"/>
+        <mxCell id="79" value="6. EntityCleanupNormalizer — generics + plurals" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="555" y="666" width="425" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="80" value="7. IndustryNormalizer — 100+ → 18 industries" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="555" y="700" width="425" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="81" value="8. EntitySummarizer — LLM entity descriptions" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="555" y="734" width="425" height="30" as="geometry"/>
+        </mxCell>
+        <!-- Phase C — Graph Analysis -->
+        <mxCell id="82" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedcc;strokeColor=#d6b656;strokeWidth=0.5;dashed=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="100" y="784" width="900" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="83" value="Phase C — Graph Analysis" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=3;fontColor=#8B7500;" vertex="1" parent="1">
+          <mxGeometry x="110" y="784" width="300" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="84" value="9. CommunityDetector — Leiden clustering" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="115" y="808" width="275" height="34" as="geometry"/>
+        </mxCell>
+        <mxCell id="85" value="10. CommunitySummarizer — LLM summaries" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="408" y="808" width="285" height="34" as="geometry"/>
+        </mxCell>
+        <mxCell id="86" value="11. CommunityEmbedder — community vectors" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffffff;strokeColor=#d6b656;align=left;spacingLeft=8;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="713" y="808" width="267" height="34" as="geometry"/>
+        </mxCell>
+        <mxCell id="87" value="Semantic rels only projected &#x2022; gpt-4o-mini for summaries &#x2022; Voyage AI voyage-4 for vectors" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#666666;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="115" y="860" width="740" height="22" as="geometry"/>
         </mxCell>
         <!-- Flow Arrow: Stage 3 → Stage 4 -->
         <mxCell id="49" style="html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2.5;strokeColor=#333333;endArrow=block;endFill=1;" edge="1" source="30" target="50" parent="1">
@@ -114,19 +139,19 @@
         <!-- Stage 4: SUPPLEMENT (Purple)                           -->
         <!-- ═══════════════════════════════════════════════════════ -->
         <mxCell id="50" value="Stage 4: SUPPLEMENT — Graph Structure" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingTop=5;spacingLeft=12;fontSize=14;fontStyle=1;fillColor=#e1d5e7;strokeColor=#9673a6;arcSize=6;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="80" y="850" width="940" height="165" as="geometry"/>
+          <mxGeometry x="80" y="940" width="940" height="165" as="geometry"/>
         </mxCell>
         <mxCell id="51" value="&lt;b&gt;Chapter nodes&lt;/b&gt;&lt;br&gt;+ Article relationships" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffffff;strokeColor=#9673a6;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="115" y="905" width="265" height="54" as="geometry"/>
+          <mxGeometry x="115" y="995" width="265" height="54" as="geometry"/>
         </mxCell>
         <mxCell id="52" value="&lt;b&gt;Resource nodes&lt;/b&gt;&lt;br&gt;(Image, Video, Webinar)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffffff;strokeColor=#9673a6;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="410" y="905" width="265" height="54" as="geometry"/>
+          <mxGeometry x="410" y="995" width="265" height="54" as="geometry"/>
         </mxCell>
         <mxCell id="53" value="&lt;b&gt;Glossary structure&lt;/b&gt;&lt;br&gt;+ concept linking" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffffff;strokeColor=#9673a6;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="705" y="905" width="265" height="54" as="geometry"/>
+          <mxGeometry x="705" y="995" width="265" height="54" as="geometry"/>
         </mxCell>
         <mxCell id="54" value="Community summary vector index (1024d cosine)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#666666;fontStyle=2;" vertex="1" parent="1">
-          <mxGeometry x="115" y="970" width="820" height="25" as="geometry"/>
+          <mxGeometry x="115" y="1060" width="820" height="25" as="geometry"/>
         </mxCell>
         <!-- Flow Arrow: Stage 4 → Stage 5 -->
         <mxCell id="59" style="html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2.5;strokeColor=#333333;endArrow=block;endFill=1;" edge="1" source="50" target="60" parent="1">
@@ -136,19 +161,19 @@
         <!-- Stage 5: VALIDATE (Red)                                -->
         <!-- ═══════════════════════════════════════════════════════ -->
         <mxCell id="60" value="Stage 5: VALIDATE (Optional)" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingTop=5;spacingLeft=12;fontSize=14;fontStyle=1;fillColor=#f8cecc;strokeColor=#b85450;arcSize=6;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="80" y="1055" width="940" height="140" as="geometry"/>
+          <mxGeometry x="80" y="1145" width="940" height="140" as="geometry"/>
         </mxCell>
         <mxCell id="61" value="ValidationQueries" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffffff;strokeColor=#b85450;shadow=0;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="230" y="1110" width="250" height="44" as="geometry"/>
+          <mxGeometry x="230" y="1200" width="250" height="44" as="geometry"/>
         </mxCell>
         <mxCell id="62" style="html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=1.5;strokeColor=#b85450;endArrow=block;endFill=1;" edge="1" source="61" target="63" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="63" value="ValidationReporter" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffffff;strokeColor=#b85450;shadow=0;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="590" y="1110" width="250" height="44" as="geometry"/>
+          <mxGeometry x="590" y="1200" width="250" height="44" as="geometry"/>
         </mxCell>
         <mxCell id="64" value="Orphan detection &#x2022; Entity quality &#x2022; Relationship patterns &#x2022; Auto-archived reports" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#666666;fontStyle=2;" vertex="1" parent="1">
-          <mxGeometry x="115" y="1160" width="820" height="25" as="geometry"/>
+          <mxGeometry x="115" y="1250" width="820" height="25" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>
