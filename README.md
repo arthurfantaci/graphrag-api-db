@@ -13,11 +13,11 @@ A Python ETL pipeline that scrapes Jama Software's **"The Essential Guide to Req
 - **Dynamic guide discovery** from live TOC — no static configuration required
 - **Async scraping** with `httpx` (default) or Playwright (browser mode for JS-rendered content)
 - **Neo4j GraphRAG integration** using `neo4j_graphrag.SimpleKGPipeline`
-- **Schema-constrained entity extraction** with 10 node types and 10 relationship types
+- **Schema-constrained entity extraction** with 12 node types and 14 relationship types
 - **Gleaning** — 2-pass LLM extraction catches 20-30% additional entities
 - **Hierarchical HTML chunking** with LangChain `HTMLHeaderTextSplitter`; optional Chonkie semantic chunking
 - **Voyage AI voyage-4 embeddings** (1024d, asymmetric); auto-detected from `VOYAGE_API_KEY` with OpenAI fallback
-- **10-step entity post-processing** — normalization, deduplication, cleanup, industry taxonomy (100+ → 18), backfill, LLM summaries, source grounding, community detection, community summaries, community embeddings
+- **11-step 3-phase entity post-processing** — backfill, source grounding, normalization, deduplication, cross-label dedup, cleanup, industry taxonomy (100+ → 18), LLM summaries, community detection, community summaries, community embeddings
 - **Leiden community detection** with LLM-generated community summaries and vector embeddings
 - **Cross-label entity deduplication** — merges same-name entities with different type labels
 - **Glossary-to-concept linking** with fuzzy matching via `rapidfuzz`
@@ -114,6 +114,12 @@ graphrag-kg scrape --dry-run
 # Use headless browser for JavaScript-rendered content
 graphrag-kg scrape --browser
 
+# Full pipeline: scrape + extract + normalize + validate + fix
+graphrag-kg scrape --full
+
+# Preview full pipeline costs
+graphrag-kg scrape --full --dry-run
+
 # Validate the graph and generate report
 graphrag-kg validate
 
@@ -201,11 +207,13 @@ asyncio.run(validate_graph())
 | `Standard` | Compliance standard | `name` |
 | `Tool` | Software/methodology | `name` |
 | `Challenge` | Problem domain | `name` |
-| `BestPractice` | Recommended approach | `name` |
-| `ProcessStage` | Lifecycle phase | `name` |
+| `Bestpractice` | Recommended approach | `name` |
+| `Processstage` | Lifecycle phase | `name` |
 | `Role` | Job function | `name` |
 | `Methodology` | Process framework | `name` |
 | `Artifact` | Work product | `name` |
+| `Organization` | Standards body / agency | `name`, `organization_type` |
+| `Outcome` | Positive result / goal | `name`, `outcome_type` |
 | `Image` | Visual resource | `src`, `alt_text` |
 | `Video` | Video resource | `url`, `title` |
 | `Webinar` | Webinar resource | `url`, `title`, `thumbnail_url` |
@@ -224,6 +232,10 @@ asyncio.run(validate_graph())
 - `PRODUCES` - Process → Artifact
 - `DEFINES` - Standard → Concept
 - `PREREQUISITE_FOR` - Sequential dependencies
+- `PUBLISHES` - Organization → Standard
+- `REGULATES` - Organization → Industry
+- `DEVELOPS` - Organization → Tool
+- `ACHIEVES` - Practice/Concept → Outcome
 
 **Structural (pipeline-created):**
 - `FROM_ARTICLE` - Chunk → Article
@@ -263,7 +275,9 @@ graphrag-kg-pipeline/
 │   ├── loaders/              # Data loading
 │   │   ├── html_loader.py    # GuideHTMLLoader (DataLoader interface)
 │   │   └── index_builder.py  # Article index utilities
-│   ├── postprocessing/       # Entity normalization (6 modules)
+│   ├── utils/                # Shared utilities
+│   │   └── retry.py          # Retry with exponential backoff
+│   ├── postprocessing/       # Entity normalization (7 modules)
 │   │   ├── normalizer.py     # Name normalization + deduplication
 │   │   ├── entity_cleanup.py # Plural/generic entity handling
 │   │   ├── industry_taxonomy.py  # 100+ → 18 canonical industries
@@ -281,7 +295,7 @@ graphrag-kg-pipeline/
 │       ├── queries.py        # Validation Cypher queries
 │       ├── fixes.py          # Data repair utilities
 │       └── reporter.py       # Report generation + auto-archive
-├── tests/                    # Comprehensive test suite (232 tests)
+├── tests/                    # Comprehensive test suite (256 tests)
 │   ├── conftest.py           # Pytest fixtures
 │   ├── test_models.py
 │   ├── test_chunking.py
