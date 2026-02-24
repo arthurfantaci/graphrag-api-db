@@ -85,6 +85,9 @@ logs/
 .enrichment_cache/
 test_output/
 
+# Neo4j database dumps (staging promote)
+backups/
+
 # Local documentation (research notes, internal analysis)
 docs/*
 !docs/architecture.drawio
