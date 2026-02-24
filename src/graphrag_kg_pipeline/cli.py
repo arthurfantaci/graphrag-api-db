@@ -19,6 +19,7 @@ This CLI provides two main commands:
 
 import argparse
 import asyncio
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -33,6 +34,55 @@ from .preflight import PreflightError
 from .scraper import run_scraper
 
 console = Console()
+
+
+def _is_local_target(uri: str) -> bool:
+    """Check whether a Neo4j URI points to a local (staging) instance.
+
+    Args:
+        uri: Neo4j connection URI.
+
+    Returns:
+        True if the URI targets localhost or 127.0.0.1.
+    """
+    return "localhost" in uri or "127.0.0.1" in uri
+
+
+def _print_target(uri: str) -> None:
+    """Print the Neo4j target URI with a staging/production label.
+
+    Args:
+        uri: Neo4j connection URI.
+    """
+    if _is_local_target(uri):
+        console.print(f"[bold green]Target: {uri} (staging)[/]")
+    else:
+        console.print(f"[bold yellow]Target: {uri} (production)[/]")
+
+
+def _confirm_production(uri: str, operation: str) -> None:
+    """Prompt for confirmation when running destructive operations against production.
+
+    Exits with code 1 if the user declines. Does nothing for local targets.
+
+    Args:
+        uri: Neo4j connection URI.
+        operation: CLI flag name that triggered this check (e.g. "--full", "--fix").
+    """
+    if _is_local_target(uri):
+        return
+
+    try:
+        answer = input(
+            f"\n  Warning: Running {operation} against PRODUCTION ({uri}). Continue? [y/N]: "
+        )
+    except (EOFError, KeyboardInterrupt):
+        console.print("\n[yellow]Aborted.[/]")
+        raise SystemExit(1) from None
+
+    if answer.strip().lower() != "y":
+        console.print("[yellow]Aborted.[/]")
+        raise SystemExit(0)
 
 
 def _create_scrape_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -194,8 +244,6 @@ async def _run_validate_command(args: argparse.Namespace) -> None:
     Args:
         args: Parsed command-line arguments.
     """
-    import os
-
     from neo4j import AsyncGraphDatabase
 
     from .validation.fixes import ValidationFixer, format_fix_preview
@@ -212,8 +260,13 @@ async def _run_validate_command(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
     console.print("[bold cyan]Knowledge Graph Validation[/]")
-    console.print(f"Database: {neo4j_uri}")
+    _print_target(neo4j_uri)
     console.print()
+
+    # Confirm before destructive operations on production
+    apply_fixes = args.fix or args.fix_chunk_ids or args.fix_entities
+    if apply_fixes and not args.dry_run:
+        _confirm_production(neo4j_uri, "--fix")
 
     driver = AsyncGraphDatabase.driver(
         neo4j_uri,
@@ -296,9 +349,16 @@ def _run_scrape_command(args: argparse.Namespace) -> None:
     Args:
         args: Parsed command-line arguments.
     """
+    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+
     console.print("[bold cyan]Requirements Guide → Neo4j GraphRAG Pipeline[/]")
+    _print_target(neo4j_uri)
     console.print(f"Output directory: {args.output}")
     console.print()
+
+    # Confirm before destructive operations on production
+    if args.full and not args.dry_run:
+        _confirm_production(neo4j_uri, "--full")
 
     if args.scrape_only:
         console.print("Mode: [yellow]Scrape only[/] (no Neo4j processing)")

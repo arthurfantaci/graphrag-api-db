@@ -69,6 +69,12 @@ uv run ty check src/         # Type check
 uv run python examples/validate_toc_discovery.py
 ```
 
+## Conventions
+
+- Conventional commits: `fix:`, `feat:`, `refactor:`, `docs:`
+- Git workflow: Issue → Branch → PR
+- **CLAUDE.md & memory files — NO separate workflow**: Changes that ONLY touch `CLAUDE.md` or `~/.claude/` memory files MUST NOT get their own issue, branch, or PR. Bundle them into the next phase's PR, or commit directly to the working branch. See global CLAUDE.md for full rule.
+
 ## Code Style Standards
 
 This project uses strict Python standards enforced by Ruff and ty:
@@ -91,7 +97,7 @@ This project uses strict Python standards enforced by Ruff and ty:
 The `.vscode/` directory contains:
 - `settings.json` - Ruff integration, Pylance, pytest, format-on-save
 - `extensions.json` - Recommended extensions (Ruff, Pylance, etc.)
-- `launch.json` - Debug configurations for CLI, run.py, and pytest
+- `launch.json` - Debug configurations for CLI, run.py, pytest, and staging (configs with "(Staging)" suffix target local Neo4j Desktop)
 
 ## Architecture
 
@@ -294,6 +300,13 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - **Community Detection** - Leiden algorithm via `leidenalg` (reference implementation). Only semantic relationship types projected (not structural). Communities get LLM-generated summaries.
 - **LangExtract Augmentation** - Post-processing entity augmentation with source grounding (text span provenance). Runs in Phase A (before cleanup) so new entities get normalized in Phase B.
 - **Supplementary Structure** - Chapter, Resource, and Glossary nodes add navigational context
+
+**Staging/Production Switching:**
+- **Environment-Driven Targeting** - `load_dotenv()` without `override=True` means shell-exported vars beat `.env` values. `eval $(./scripts/neo4j-staging.sh env)` exports staging vars; closing the terminal resets to production.
+- **Staging DBMS** - Neo4j Desktop, `bolt://localhost:7687`, password `stagingpassword`, APOC required
+- **Production Safety** - CLI shows green "(staging)" or yellow "(production)" labels; `--full` and `--fix` against production require interactive confirmation; `--dry-run` bypasses the prompt
+- **Promotion** - `./scripts/neo4j-staging.sh promote` dumps staging DB + uploads to Aura. Requires DBMS stopped for dump. Fallback: manual upload via Aura Console UI.
+- **VS Code Configs** - "(Staging)" suffix configs use inline `env` overrides (not `envFile`), so they always target localhost regardless of `.env` contents
 
 **Data Quality:**
 - **Validation Framework** - Comprehensive checks for orphans, duplicates, and invalid patterns
