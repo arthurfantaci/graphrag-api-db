@@ -580,6 +580,7 @@ async def _run_preflight(_output_dir: Path) -> None:
             database=config.neo4j_database,
             expected_dimensions=config.embedding_dimensions,
             voyage_api_key=config.voyage_api_key,
+            typesafe_api_key=config.typesafe_api_key,
         )
 
         console.print("  Neo4j: [green]connected[/]")
@@ -603,6 +604,9 @@ async def _run_preflight(_output_dir: Path) -> None:
             console.print(f"  Voyage AI: {status}")
         else:
             console.print("  Embeddings: [dim]OpenAI (no VOYAGE_API_KEY)[/]")
+
+        ts_status = "[green]valid[/]" if result.typesafe_api_valid else "[red]invalid[/]"
+        console.print(f"  TypeSafe: {ts_status}")
 
         console.print("[bold green]  ✓ All checks passed[/]")
 
@@ -809,13 +813,20 @@ async def _run_post_processing(_output_dir: Path) -> None:
             f"merged {cleanup_stats['merged_plurals']} plurals"
         )
 
-        # B.5 Industry consolidation
-        console.print("  Consolidating industries...")
-        industry_normalizer = IndustryNormalizer(driver, config.neo4j_database)
-        industry_stats = await industry_normalizer.consolidate_industries()
+        # B.5 Industry consolidation (exact tables, then one TypeSafe Choice per leftover)
+        console.print("  Consolidating industries (TypeSafe judgments)...")
+        from .utils.typesafe_client import create_typesafe_client
+
+        async with create_typesafe_client(config.typesafe_api_key) as typesafe_client:
+            industry_normalizer = IndustryNormalizer(
+                driver, config.neo4j_database, typesafe_client=typesafe_client
+            )
+            industry_stats = await industry_normalizer.consolidate_industries()
         console.print(
             f"    Consolidated {industry_stats['original_count']} → "
-            f"{industry_stats['canonical_count']} industries"
+            f"{industry_stats['canonical_count']} industries "
+            f"({industry_stats['table_resolved']} by table, "
+            f"{industry_stats['model_resolved']} by TypeSafe)"
         )
 
         # B.6 Entity description summarization (on cleaned, deduplicated entities)

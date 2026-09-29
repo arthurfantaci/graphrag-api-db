@@ -6,6 +6,7 @@ Provides a hierarchy of exceptions for different error conditions:
 - PlaywrightNotAvailableError: Playwright package not installed
 - BrowserNotInstalledError: Browser binaries not installed
 - Neo4jConfigError: Neo4j environment variables not set
+- TypeSafeConfigError: TypeSafe API key not set
 """
 
 
@@ -65,4 +66,19 @@ class Neo4jConfigError(ScraperError):
         super().__init__(
             "Neo4j configuration missing. "
             "Set NEO4J_URI, NEO4J_USERNAME, and NEO4J_PASSWORD environment variables."
+        )
+
+
+class TypeSafeConfigError(ScraperError):
+    """TypeSafe API key not set.
+
+    Raised when a pipeline step that needs a System One judgment (industry
+    consolidation) runs without ``TYPESAFE_API_KEY`` in the environment.
+    """
+
+    def __init__(self) -> None:
+        """Initialize TypeSafeConfigError."""
+        super().__init__(
+            "TYPESAFE_API_KEY is required for industry consolidation. "
+            "Set it in .env or export it in the shell, then rerun."
         )

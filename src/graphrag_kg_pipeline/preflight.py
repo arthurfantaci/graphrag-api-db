@@ -11,6 +11,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import structlog
+from typesafe_sdk import Noul
+
+from graphrag_kg_pipeline.utils.typesafe_client import create_typesafe_client
 
 if TYPE_CHECKING:
     from neo4j import AsyncDriver
@@ -37,6 +40,7 @@ class PreflightResult:
         vector_index_dimensions: Dimensions of existing vector index, or None if no index.
         voyage_api_valid: Whether the Voyage API key produced a valid embedding.
         using_voyage: Whether Voyage AI will be used for embeddings.
+        typesafe_api_valid: Whether the TypeSafe API key answered a test question.
     """
 
     neo4j_connected: bool = False
@@ -45,6 +49,7 @@ class PreflightResult:
     vector_index_dimensions: int | None = None
     voyage_api_valid: bool = False
     using_voyage: bool = False
+    typesafe_api_valid: bool = False
 
 
 async def run_preflight_checks(
@@ -52,6 +57,7 @@ async def run_preflight_checks(
     database: str = "neo4j",
     expected_dimensions: int = 1536,
     voyage_api_key: str = "",
+    typesafe_api_key: str = "",
 ) -> PreflightResult:
     """Run all pre-flight validation checks.
 
@@ -63,6 +69,8 @@ async def run_preflight_checks(
         database: Neo4j database name.
         expected_dimensions: Expected embedding vector dimensions.
         voyage_api_key: Voyage AI API key (empty string to skip check).
+        typesafe_api_key: TypeSafe API key. Required; industry consolidation
+            cannot run without it, so an empty value fails before any network call.
 
     Returns:
         PreflightResult with check outcomes.
@@ -71,6 +79,15 @@ async def run_preflight_checks(
         PreflightError: If a critical check fails.
     """
     result = PreflightResult(using_voyage=bool(voyage_api_key))
+
+    # 0. TypeSafe key presence (cheapest check; consolidation needs it)
+    if not typesafe_api_key.strip():
+        msg = (
+            "TYPESAFE_API_KEY is not set. Industry consolidation needs a TypeSafe "
+            "System One judgment for every name the exact-match tables miss.\n"
+            "Add TYPESAFE_API_KEY to your .env file or export it in the shell."
+        )
+        raise PreflightError(msg)
 
     # 1. Neo4j connectivity
     await _check_neo4j_connectivity(driver, database, result)
@@ -88,6 +105,9 @@ async def run_preflight_checks(
     if voyage_api_key:
         await _check_voyage_api(voyage_api_key, expected_dimensions, result)
 
+    # 6. TypeSafe API key validity
+    await _check_typesafe_api(typesafe_api_key, result)
+
     logger.info(
         "Pre-flight checks passed",
         neo4j=result.neo4j_connected,
@@ -96,6 +116,7 @@ async def run_preflight_checks(
         vector_index_dims=result.vector_index_dimensions,
         using_voyage=result.using_voyage,
         voyage_valid=result.voyage_api_valid,
+        typesafe_valid=result.typesafe_api_valid,
     )
 
     return result
@@ -292,3 +313,31 @@ async def _check_voyage_api(
     actual_dims = len(test_result.embeddings[0]) if test_result.embeddings else 0
     msg = f"Voyage AI returned {actual_dims} dimensions but expected {expected_dimensions}."
     raise PreflightError(msg)
+
+
+async def _check_typesafe_api(api_key: str, result: PreflightResult) -> None:
+    """Validate the TypeSafe API key with one tiny System One call.
+
+    Args:
+        api_key: TypeSafe API key.
+        result: PreflightResult to update.
+
+    Raises:
+        PreflightError: If the client cannot be built or the call fails.
+    """
+    try:
+        client = create_typesafe_client(api_key)
+        async with client:
+            response = await client.system_one(
+                state="preflight check",
+                questions={"english": Noul(instructions="Is the text written in English?")},
+            )
+    except Exception as e:
+        msg = (
+            f"TypeSafe API check failed: {e}\n"
+            "Verify TYPESAFE_API_KEY in your .env file or shell environment."
+        )
+        raise PreflightError(msg) from e
+
+    result.typesafe_api_valid = True
+    logger.info("TypeSafe API check passed", model=response.model)

@@ -4,18 +4,33 @@ This module provides mapping from industry name variants to
 canonical industry names, enabling proper deduplication of
 Industry nodes in the knowledge graph.
 
-It also identifies:
-- Terms that are concepts, not industries (should be reclassified)
-- Terms that are too generic (should be deleted)
+Classification runs in two tiers:
+
+1. **Exact-match tables** (free): ``INDUSTRY_TAXONOMY``, ``CONCEPTS_NOT_INDUSTRIES``,
+   ``ORGANIZATIONS_NOT_INDUSTRIES``, ``GENERIC_TERMS_TO_DELETE``.
+2. **TypeSafe Choice judgment** for anything the tables miss. One ``Choice``
+   question per unresolved name, batched into a single request, returns the
+   selected option plus a probability per option and a confidence value.
+
+The legacy rapidfuzz cascade (``classify_industry_term``, ``normalize_industry``)
+is kept only so ``examples/compare_industry_classification.py`` can show the
+before/after difference. The pipeline no longer calls it.
 """
 
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
 
 from rapidfuzz import fuzz, process
 import structlog
+from typesafe_sdk import Choice, TypeSafeError
+
+from graphrag_kg_pipeline.exceptions import TypeSafeConfigError
 
 if TYPE_CHECKING:
     from neo4j import Driver
+    from typesafe_sdk import AsyncTypeSafeClient
 
 logger = structlog.get_logger(__name__)
 
@@ -240,9 +255,274 @@ GENERIC_TERMS_TO_DELETE: set[str] = {
 # Canonical list of industries
 CANONICAL_INDUSTRIES = sorted(set(INDUSTRY_TAXONOMY.values()))
 
+# =============================================================================
+# TYPESAFE CHOICE CRITERIA
+# =============================================================================
+# Option name -> description sent to the model. Names and descriptions are both
+# sent, so each description should separate its option from the neighbors.
+
+INDUSTRY_CRITERIA: dict[str, str] = {
+    "aerospace": "Aircraft, aviation, and aerospace manufacturers and suppliers",
+    "automotive": "Cars, trucks, electric and autonomous vehicles, and their suppliers",
+    "construction": "Building, architecture, engineering, and construction (AEC) firms",
+    "consumer electronics": "Phones, appliances, and other electronic products sold to consumers",
+    "consumer goods": "Packaged goods, food and beverage, and other everyday consumer products",
+    "defense": "Military systems, weapons, and defense contractors",
+    "energy": "Oil and gas, renewables, and other energy producers",
+    "financial services": "Banks, insurers, fintech, and other financial institutions",
+    "government": "Public sector agencies and federal, state, or local government bodies",
+    "healthcare": "Hospitals, clinics, providers, and health care delivery",
+    "industrial equipment": "Heavy machinery, industrial tools, and factory equipment makers",
+    "life sciences": "Pharmaceutical, biotech, and biopharma companies",
+    "manufacturing": "General discrete or process manufacturing not covered by a narrower sector",
+    "marine": "Shipbuilding, maritime, and offshore vessels",
+    "medical devices": "Medical device and medtech makers regulated as devices",
+    "nuclear": "Nuclear power plants, reactors, and nuclear fuel",
+    "rail": "Railways, trains, and rail infrastructure",
+    "semiconductor": "Chip design and semiconductor fabrication",
+    "software": "Software vendors and SaaS companies as an industry",
+    "space": "Satellites, launch vehicles, and space systems",
+    "telecommunications": "Telecom carriers, networks, and communications equipment",
+    "transportation": "Transport and logistics not specific to rail, marine, or automotive",
+    "utilities": "Electric, water, and gas utilities and power generation",
+}
+
+NON_INDUSTRY_CRITERIA: dict[str, str] = {
+    "organization": (
+        "A specific named body such as a company, agency, standards body, or "
+        "certification body (for example FDA, IEEE, NASA), not a market sector"
+    ),
+    "concept_not_industry": (
+        "A discipline, technology, methodology, or process (for example systems "
+        "engineering, machine learning, supply chain), not a market sector"
+    ),
+    "too_generic": (
+        "Too vague to name any sector (for example 'industry', 'regulated "
+        "industries', 'various sectors')"
+    ),
+    "none_of_these": (
+        "A real industry sector that is missing from this list (for example "
+        "retail, agriculture, education, chemicals)"
+    ),
+}
+
+INDUSTRY_CLASSIFICATION_CONTEXT = (
+    "Each entry in `terms` is a name that an LLM extracted as an Industry node "
+    "from a guide on requirements management and traceability for regulated "
+    "engineering. Judge each name on its own."
+)
+
+DEFAULT_MIN_CONFIDENCE = 0.5
+"""Answers below this confidence are demoted to ``unknown`` and left untouched."""
+
+DEFAULT_BATCH_SIZE = 5
+"""Terms per TypeSafe request.
+
+Questions in one request run in parallel, but answer quality falls off a cliff as
+the request grows. Measured on 53 staging Industry names with this 27-option
+criteria set: batch 1 and 5 give median confidence ~0.89; batch 10 starts to
+degrade later terms; batch 25 and 50 collapse almost every term to
+``concept_not_industry`` at ~0.25. Keep this small.
+"""
+
+
+def build_industry_choice_criteria() -> dict[str, str]:
+    """Return the full Choice option set: canonical industries plus dispositions.
+
+    Returns:
+        Mapping of option name to description, in the order sent to the model.
+    """
+    return {**INDUSTRY_CRITERIA, **NON_INDUSTRY_CRITERIA}
+
+
+def classify_by_table(raw_name: str) -> tuple[str, str | None] | None:
+    """Classify an industry term by exact table lookup only.
+
+    This is the free fast path. It never fuzzy-matches, so near misses such as
+    ``"retail"`` return ``None`` and are handed to the model.
+
+    Args:
+        raw_name: Raw industry name.
+
+    Returns:
+        ``(action, canonical)`` on an exact hit, or ``None`` if no table matches.
+    """
+    if not raw_name:
+        return ("delete", None)
+
+    normalized = raw_name.lower().strip()
+
+    if normalized in ORGANIZATIONS_NOT_INDUSTRIES:
+        return ("reclassify_org", None)
+    if normalized in CONCEPTS_NOT_INDUSTRIES:
+        return ("reclassify", None)
+    if normalized in GENERIC_TERMS_TO_DELETE:
+        return ("delete", None)
+    if normalized in INDUSTRY_TAXONOMY:
+        return ("keep", INDUSTRY_TAXONOMY[normalized])
+    return None
+
+
+def judgment_to_action(
+    choice: str,
+    confidence: float,
+    min_confidence: float,
+) -> tuple[str, str | None]:
+    """Map a Choice answer onto the consolidator's action tuple.
+
+    Args:
+        choice: Selected option name.
+        confidence: Confidence value returned with the answer.
+        min_confidence: Floor below which the answer is demoted to ``unknown``.
+
+    Returns:
+        ``(action, canonical)`` in the same shape as ``classify_industry_term``.
+    """
+    if confidence < min_confidence:
+        return ("unknown", None)
+    if choice in INDUSTRY_CRITERIA:
+        return ("keep", choice)
+    if choice == "organization":
+        return ("reclassify_org", None)
+    if choice == "concept_not_industry":
+        return ("reclassify", None)
+    if choice == "too_generic":
+        return ("delete", None)
+    return ("unknown", None)
+
+
+@dataclass(frozen=True)
+class IndustryJudgment:
+    """One TypeSafe judgment for one industry name.
+
+    Attributes:
+        term: The raw name that was judged.
+        choice: Selected option.
+        confidence: Confidence in the selected option, 0 to 1.
+        probabilities: Probability per option; values sum to about 1.
+        action: Consolidator action derived from ``choice`` and ``confidence``.
+        canonical: Canonical industry name when ``action`` is ``"keep"``.
+        error: SDK error message when the batch request failed; the term is
+            then ``unknown`` with zero confidence and left untouched.
+    """
+
+    term: str
+    choice: str
+    confidence: float
+    probabilities: dict[str, float]
+    action: str
+    canonical: str | None
+    error: str | None = None
+
+
+def build_industry_questions(terms: list[str]) -> dict[str, Choice]:
+    """Build one Choice question per term, keyed ``term_{i}``.
+
+    Question IDs are for code only and are not sent to the model, so each
+    instruction names its term by state path (``terms[i]``).
+
+    Args:
+        terms: Raw industry names in the order they appear in ``state["terms"]``.
+
+    Returns:
+        Mapping of question ID to ``Choice``.
+    """
+    criteria = build_industry_choice_criteria()
+    return {
+        f"term_{i}": Choice(
+            instructions=(
+                f"Classify the name in `terms[{i}]`. Pick the canonical industry "
+                "sector it belongs to. If it is not a sector, pick organization, "
+                "concept_not_industry, or too_generic. If it is a real sector "
+                "missing from the list, pick none_of_these."
+            ),
+            criteria=criteria,
+        )
+        for i in range(len(terms))
+    }
+
+
+async def classify_industry_terms(
+    client: AsyncTypeSafeClient,
+    terms: list[str],
+    *,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    min_confidence: float = DEFAULT_MIN_CONFIDENCE,
+) -> list[IndustryJudgment]:
+    """Classify industry names with one TypeSafe Choice per term.
+
+    Terms are sent in batches; every question in a batch shares one ``state``
+    and runs in parallel on the model side. A batch whose request fails after
+    the SDK's own retries is logged and its terms come back as ``unknown`` with
+    ``error`` set, so one outage cannot abort consolidation or lose other batches.
+
+    Args:
+        client: Configured async TypeSafe client.
+        terms: Raw industry names the exact-match tables did not resolve.
+        batch_size: Maximum terms per request.
+        min_confidence: Floor below which an answer becomes ``unknown``.
+
+    Returns:
+        One ``IndustryJudgment`` per term, in input order.
+    """
+    judgments: list[IndustryJudgment] = []
+
+    for start in range(0, len(terms), batch_size):
+        batch = terms[start : start + batch_size]
+        try:
+            response = await client.system_one(
+                state={"terms": batch, "context": INDUSTRY_CLASSIFICATION_CONTEXT},
+                questions=build_industry_questions(batch),
+            )
+        except TypeSafeError as e:
+            logger.error(
+                "TypeSafe batch failed; leaving its terms untouched",
+                batch_start=start,
+                terms=batch,
+                error=str(e),
+            )
+            judgments.extend(
+                IndustryJudgment(
+                    term=term,
+                    choice="",
+                    confidence=0.0,
+                    probabilities={},
+                    action="unknown",
+                    canonical=None,
+                    error=str(e),
+                )
+                for term in batch
+            )
+            continue
+        for i, term in enumerate(batch):
+            answer = response.choices[f"term_{i}"]
+            action, canonical = judgment_to_action(answer.choice, answer.confidence, min_confidence)
+            judgments.append(
+                IndustryJudgment(
+                    term=term,
+                    choice=answer.choice,
+                    confidence=answer.confidence,
+                    probabilities=dict(answer.probabilities),
+                    action=action,
+                    canonical=canonical,
+                )
+            )
+
+    logger.info(
+        "TypeSafe industry classification complete",
+        terms=len(terms),
+        requests=-(-len(terms) // batch_size) if terms else 0,
+        demoted=sum(1 for j in judgments if j.action == "unknown" and j.error is None),
+        failed=sum(1 for j in judgments if j.error is not None),
+    )
+    return judgments
+
 
 def classify_industry_term(raw_name: str) -> tuple[str, str | None]:
-    """Classify an industry term and return its disposition.
+    """Classify an industry term with the legacy rapidfuzz cascade.
+
+    Kept for before/after comparison only. The pipeline uses
+    ``classify_by_table`` and ``classify_industry_terms`` instead.
 
     Args:
         raw_name: Raw industry name to classify.
@@ -374,20 +654,39 @@ class IndustryNormalizer:
     - Consolidate remaining industries to canonical forms
 
     Example:
-        >>> normalizer = IndustryNormalizer(driver)
+        >>> client = create_typesafe_client(config.typesafe_api_key)
+        >>> normalizer = IndustryNormalizer(driver, typesafe_client=client)
         >>> stats = await normalizer.consolidate_industries()
         >>> print(f"Reclassified {stats['reclassified']}, deleted {stats['deleted']}")
     """
 
-    def __init__(self, driver: "Driver", database: str = "neo4j") -> None:
+    def __init__(
+        self,
+        driver: Driver,
+        database: str = "neo4j",
+        typesafe_client: AsyncTypeSafeClient | None = None,
+        min_confidence: float = DEFAULT_MIN_CONFIDENCE,
+    ) -> None:
         """Initialize the normalizer.
 
         Args:
             driver: Neo4j driver instance.
             database: Database name.
+            typesafe_client: Configured async TypeSafe client. Required; names
+                the exact-match tables miss are judged by the model.
+            min_confidence: Confidence floor below which a model answer is
+                demoted to ``unknown`` and the node is left untouched.
+
+        Raises:
+            TypeSafeConfigError: If ``typesafe_client`` is ``None``.
         """
+        if typesafe_client is None:
+            raise TypeSafeConfigError
+
         self.driver = driver
         self.database = database
+        self.typesafe_client = typesafe_client
+        self.min_confidence = min_confidence
 
     async def get_current_industries(self) -> list[dict]:
         """Get all current Industry nodes.
@@ -409,37 +708,64 @@ class IndustryNormalizer:
         """Consolidate Industry nodes: reclassify, delete, and merge.
 
         This method:
-        1. Reclassifies concept terms from Industry to Concept nodes
-        2. Deletes generic/meaningless Industry nodes
-        3. Merges remaining industries to canonical forms
+        1. Resolves names by exact table lookup (free fast path)
+        2. Sends the rest to TypeSafe as one Choice per name, batched
+        3. Reclassifies concept and organization terms
+        4. Deletes generic/meaningless Industry nodes
+        5. Merges remaining industries to canonical forms
 
         Returns:
-            Statistics about the consolidation.
+            Statistics about the consolidation. ``judgments`` holds every
+            model answer (choice, confidence, probabilities, action) so the
+            run can be audited or diffed against the legacy cascade.
         """
-        stats = {
+        stats: dict = {
             "original_count": 0,
+            "table_resolved": 0,
+            "model_resolved": 0,
             "reclassified": 0,
             "deleted": 0,
             "merged": 0,
             "canonical_count": 0,
             "unknown": [],
+            "judgments": [],
         }
 
         # Get current industries
         industries = await self.get_current_industries()
         stats["original_count"] = len(industries)
 
-        # Classify each industry
+        # Tier 1: exact-match tables
+        resolved: list[tuple[dict, str, str | None]] = []
+        unresolved: list[dict] = []
+        for industry in industries:
+            table_hit = classify_by_table(industry["name"])
+            if table_hit is None:
+                unresolved.append(industry)
+            else:
+                action, canonical = table_hit
+                resolved.append((industry, action, canonical))
+        stats["table_resolved"] = len(resolved)
+
+        # Tier 2: TypeSafe Choice per unresolved name
+        judgments = await classify_industry_terms(
+            self.typesafe_client,
+            [industry["name"] for industry in unresolved],
+            min_confidence=self.min_confidence,
+        )
+        for industry, judgment in zip(unresolved, judgments, strict=True):
+            resolved.append((industry, judgment.action, judgment.canonical))
+        stats["model_resolved"] = len(judgments)
+        stats["judgments"] = [asdict(judgment) for judgment in judgments]
+
+        # Route each industry to its action
         to_reclassify = []
         to_reclassify_org = []
         to_delete = []
         canonical_groups: dict[str, list[dict]] = {}
         unknown = []
 
-        for industry in industries:
-            name = industry["name"]
-            action, canonical = classify_industry_term(name)
-
+        for industry, action, canonical in resolved:
             if action == "reclassify":
                 to_reclassify.append(industry)
             elif action == "reclassify_org":
@@ -546,6 +872,8 @@ class IndustryNormalizer:
         logger.info(
             "Industry consolidation complete",
             original=stats["original_count"],
+            table_resolved=stats["table_resolved"],
+            model_resolved=stats["model_resolved"],
             reclassified=stats["reclassified"],
             deleted=stats["deleted"],
             merged=stats["merged"],

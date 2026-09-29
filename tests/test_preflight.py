@@ -16,6 +16,7 @@ from graphrag_kg_pipeline.preflight import (
     _check_apoc,
     _check_existing_data,
     _check_neo4j_connectivity,
+    _check_typesafe_api,
     _check_vector_index,
     _check_voyage_api,
     run_preflight_checks,
@@ -282,11 +283,17 @@ async def test_run_preflight_checks_all_pass() -> None:
             "graphrag_kg_pipeline.preflight._check_vector_index",
             new_callable=AsyncMock,
         ),
+        patch(
+            "graphrag_kg_pipeline.preflight._check_typesafe_api",
+            new_callable=AsyncMock,
+        ),
     ):
         mock_neo4j.side_effect = lambda _d, _db, r: setattr(r, "neo4j_connected", True)
 
         driver = AsyncMock()
-        result = await run_preflight_checks(driver, "neo4j", 1536, "")
+        result = await run_preflight_checks(
+            driver, "neo4j", 1536, "", typesafe_api_key="ts-test-key"
+        )
         assert isinstance(result, PreflightResult)
         assert result.using_voyage is False
 
@@ -312,12 +319,18 @@ async def test_run_preflight_checks_with_voyage() -> None:
             new_callable=AsyncMock,
         ),
         patch(
+            "graphrag_kg_pipeline.preflight._check_typesafe_api",
+            new_callable=AsyncMock,
+        ),
+        patch(
             "graphrag_kg_pipeline.preflight._check_voyage_api",
             new_callable=AsyncMock,
         ) as mock_voyage,
     ):
         driver = AsyncMock()
-        result = await run_preflight_checks(driver, "neo4j", 1536, "pa-test-key")
+        result = await run_preflight_checks(
+            driver, "neo4j", 1536, "pa-test-key", typesafe_api_key="ts-test-key"
+        )
         assert result.using_voyage is True
         mock_voyage.assert_called_once_with("pa-test-key", 1536, result)
 
@@ -328,3 +341,72 @@ async def test_preflight_error_is_importable() -> None:
     from graphrag_kg_pipeline import PreflightError as PkgPreflightError
 
     assert PkgPreflightError is PreflightError
+
+
+# ---------------------------------------------------------------------------
+# TypeSafe API Check
+# ---------------------------------------------------------------------------
+
+
+def _mock_typesafe_client() -> AsyncMock:
+    """Async client mock usable as an async context manager."""
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    return client
+
+
+@pytest.mark.asyncio
+async def test_typesafe_api_valid_key() -> None:
+    """Passes when one System One call succeeds."""
+    client = _mock_typesafe_client()
+
+    with patch("graphrag_kg_pipeline.preflight.create_typesafe_client", return_value=client):
+        result = PreflightResult()
+        await _check_typesafe_api("ts-test-key", result)
+
+    assert result.typesafe_api_valid is True
+    client.system_one.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_typesafe_api_invalid_key() -> None:
+    """Raises PreflightError when the System One call fails."""
+    client = _mock_typesafe_client()
+    client.system_one.side_effect = Exception("401 Unauthorized")
+
+    with (
+        patch("graphrag_kg_pipeline.preflight.create_typesafe_client", return_value=client),
+        pytest.raises(PreflightError, match="TypeSafe API check failed"),
+    ):
+        await _check_typesafe_api("ts-bad-key", PreflightResult())
+
+
+@pytest.mark.asyncio
+async def test_run_preflight_checks_missing_typesafe_key_fails_fast() -> None:
+    """A missing TYPESAFE_API_KEY aborts before any Neo4j check runs."""
+    with patch(
+        "graphrag_kg_pipeline.preflight._check_neo4j_connectivity",
+        new_callable=AsyncMock,
+    ) as mock_neo4j:
+        with pytest.raises(PreflightError, match="TYPESAFE_API_KEY"):
+            await run_preflight_checks(AsyncMock(), "neo4j", 1536, "", typesafe_api_key="")
+        mock_neo4j.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_run_preflight_checks_with_typesafe() -> None:
+    """Full preflight runs the TypeSafe check with the supplied key."""
+    with (
+        patch(
+            "graphrag_kg_pipeline.preflight._check_neo4j_connectivity",
+            new_callable=AsyncMock,
+        ),
+        patch("graphrag_kg_pipeline.preflight._check_apoc", new_callable=AsyncMock),
+        patch("graphrag_kg_pipeline.preflight._check_existing_data", new_callable=AsyncMock),
+        patch("graphrag_kg_pipeline.preflight._check_vector_index", new_callable=AsyncMock),
+        patch("graphrag_kg_pipeline.preflight._check_typesafe_api", new_callable=AsyncMock) as ts,
+    ):
+        result = await run_preflight_checks(
+            AsyncMock(), "neo4j", 1536, "", typesafe_api_key="ts-test-key"
+        )
+        ts.assert_awaited_once_with("ts-test-key", result)

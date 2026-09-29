@@ -45,6 +45,7 @@ from .exceptions import (
     Neo4jConfigError,
     PlaywrightNotAvailableError,
     ScraperError,
+    TypeSafeConfigError,
 )
 
 # Extraction
@@ -239,6 +240,7 @@ __all__ = [
     "BrowserNotInstalledError",
     "FetchError",
     "Neo4jConfigError",
+    "TypeSafeConfigError",
     "PlaywrightNotAvailableError",
     "PreflightError",
     "ScraperError",

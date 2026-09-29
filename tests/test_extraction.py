@@ -431,3 +431,29 @@ class TestGlossaryPipelineProcessing:
 
         assert "# Requirements Management Glossary" in result
         assert "##" not in result
+
+
+class TestTypeSafeConfig:
+    """Tests for the TypeSafe key in pipeline configuration."""
+
+    def test_config_defaults_typesafe_key_to_empty(self) -> None:
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
+
+        assert KGPipelineConfig().typesafe_api_key == ""
+
+    def test_config_from_env_reads_typesafe_key(
+        self, mock_env_vars: dict[str, str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
+
+        monkeypatch.setenv("TYPESAFE_API_KEY", "ts-test-key-456")
+        config = KGPipelineConfig.from_env()
+        assert config.typesafe_api_key == "ts-test-key-456"
+
+    def test_config_from_env_tolerates_missing_typesafe_key(
+        self, mock_env_vars: dict[str, str]
+    ) -> None:
+        """Scrape-only runs need no key; consolidation enforces it later."""
+        from graphrag_kg_pipeline.extraction.pipeline import KGPipelineConfig
+
+        assert KGPipelineConfig.from_env().typesafe_api_key == ""

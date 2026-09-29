@@ -36,6 +36,7 @@ A Python ETL pipeline that scrapes Jama Software's **"The Essential Guide to Req
 - **Neo4j 5.x** with APOC plugin
 - **OpenAI API key** for entity extraction, gleaning, and summaries
 - **Voyage AI API key** (optional, preferred) for embeddings — falls back to OpenAI
+- **TypeSafe API key** for System One judgments in industry consolidation (preflight fails fast without it)
 - **UV** (recommended) or pip for package management
 
 ## Installation
@@ -77,6 +78,10 @@ OPENAI_API_KEY=sk-your-api-key
 # When set, voyage-4 (1024d, asymmetric) is auto-detected.
 # When absent, falls back to OpenAI text-embedding-3-small.
 VOYAGE_API_KEY=pa-your-api-key
+
+# TypeSafe (required for post-processing)
+# Jev Choice judgments classify Industry names the exact-match tables miss.
+TYPESAFE_API_KEY=ts-your-api-key
 
 # Neo4j connection
 NEO4J_URI=neo4j+s://xxx.databases.neo4j.io
