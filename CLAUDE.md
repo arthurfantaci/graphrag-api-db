@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
+Import package: `graphrag_kg_pipeline` (src layout: `src/graphrag_kg_pipeline/`). Tests import from it directly.
+
 This is a complete Neo4j GraphRAG pipeline that scrapes Jama Software's "Essential Guide to Requirements Management and Traceability" and loads it into a Neo4j knowledge graph using `neo4j_graphrag`'s SimpleKGPipeline. The pipeline performs LLM-based entity extraction, industry normalization, and vector embeddings for semantic RAG retrieval.
 
 ## Commands
@@ -61,6 +63,8 @@ uv run pytest                # Run tests
 uv run ruff check .          # Lint
 uv run ruff format .         # Format
 uv run ty check src/         # Type check
+# ty has ~210 pre-existing diagnostics (sync `Driver` typed on async code). Judge a change by
+# the count versus main (`git stash; uv run ty check src/; git stash pop`), not by zero.
 ```
 
 ### Pre-Ingestion Validation
@@ -133,7 +137,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 │  │   4. EntityNormalizer.deduplicate_by_name() — merge duplicates    │  │
 │  │   5. EntityNormalizer.deduplicate_cross_label() — cross-label     │  │
 │  │   6. EntityCleanupNormalizer.run_cleanup() — generics + plurals   │  │
-│  │   7. IndustryNormalizer.consolidate_industries() — taxonomy       │  │
+│  │   7. IndustryNormalizer.consolidate_industries() — tables+Jev    │  │
 │  │   8. EntitySummarizer.summarize() — LLM entity descriptions      │  │
 │  │ Phase C — Graph Analysis (on clean entities):                     │  │
 │  │   9. CommunityDetector.detect_communities() — Leiden clustering   │  │
@@ -229,7 +233,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 
 12. **postprocessing/entity_cleanup.py** - `EntityCleanupNormalizer`: generic entity deletion, plural-to-singular merging.
 
-13. **postprocessing/industry_taxonomy.py** - `IndustryNormalizer` consolidates 100+ variants to 18 canonical industries.
+13. **postprocessing/industry_taxonomy.py** - `IndustryNormalizer` consolidates Industry nodes in two tiers: exact-match tables (free), then one TypeSafe `Choice` per leftover name (23 canonical industries + `organization` / `concept_not_industry` / `too_generic` / `none_of_these`). Returns per-term judgments (choice, confidence, probabilities) in `stats["judgments"]`. The legacy rapidfuzz cascade `classify_industry_term` stays only for `examples/compare_industry_classification.py`.
 
 14. **postprocessing/mentioned_in_backfill.py** - `MentionedInBackfiller`: creates MENTIONED_IN and APPLIES_TO relationships.
 
@@ -275,6 +279,7 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - Rich progress bars don't flush to redirected output; monitor via Neo4j node count queries
 - Direct OpenAI API calls (gleaning) need `response_format={"type": "json_object"}`
 - Gleaning runs 2 passes by default (each pass queries Neo4j for latest state)
+- Post-processing needs `TYPESAFE_API_KEY`; preflight fails fast without it. Tune the industry judgment floor and batch size with `examples/compare_industry_classification.py --batch-size N --json out.json` against staging (read-only)
 
 **Scraping Layer:**
 - **Protocol Pattern (PEP 544)** - Structural subtyping for fetcher abstraction enables testing and extensibility
@@ -293,7 +298,10 @@ The pipeline executes 5 stages to transform web content into a queryable knowled
 - **Schema-Constrained Extraction** - 12 node types and 14 relationship types prevent schema drift
 - **Organization vs Industry** - `ORGANIZATIONS_NOT_INDUSTRIES` set in `industry_taxonomy.py` relabels orgs (NASA, FDA, IEEE) from Industry to Organization during consolidation
 - **LangExtract Entity Labels** - `_create_entity()` MERGE must set `__Entity__:__KGBuilder__` labels on creation for cross-label dedup visibility
-- **Industry Taxonomy** - 100+ variants normalized to 18 canonical industries
+- **Industry Taxonomy** - 100+ variants normalized to 23 canonical industries by exact table; unresolved names go to a TypeSafe Choice judgment. `TYPESAFE_API_KEY` is required: preflight fails fast without it and `IndustryNormalizer` raises `TypeSafeConfigError` when built without a client.
+- **TypeSafe client** - `utils/typesafe_client.py` builds `AsyncTypeSafeClient` with the SDK's own `RetryPolicy(max_retries=3)`. Do NOT wrap it in the tenacity decorators (same rule as Voyage: the SDK already retries 429/529/5xx). Tests build real `SystemOneResponse` objects and mock `system_one()`; never call the API in CI. `SystemOneResponse(model=..., usage=Usage(), answers={"term_0": ChoiceAnswer(...)})`: `usage` is required.
+- **Judgment confidence** - Choice `confidence` measures how peaked the probability distribution is, not correctness. Answers under `min_confidence` (default 0.5) are demoted to `unknown` and the node is left untouched. Tune the floor with `examples/compare_industry_classification.py` against staging; identical requests can vary by a few hundredths, so borderline terms (e.g. "IT" at 0.47-0.49) can flip between runs.
+- **Batch-size cliff** - Do not pack many Choice questions into one System One request when each carries a large criteria set. Measured on 53 staging names: batch 1 and 5 give median confidence 0.89; batch 10 degrades later terms; batch 25 and 50 collapse nearly every answer to `concept_not_industry` at ~0.25. `DEFAULT_BATCH_SIZE = 5`. Re-measure with `--batch-size` if the option set changes.
 - **Entity Deduplication** - Plural forms merged (e.g., "requirement" + "requirements" → "requirement")
 - **Hierarchical Chunking** - LangChain HTMLHeaderTextSplitter preserves document structure; optional Chonkie SemanticChunker for stage 2
 - **Voyage AI Embeddings** - Auto-detected from `VOYAGE_API_KEY` env var; asymmetric `input_type` ("document" for indexing, "query" for search)

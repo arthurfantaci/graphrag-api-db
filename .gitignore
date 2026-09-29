@@ -92,3 +92,4 @@ backups/
 docs/*
 !docs/architecture.drawio
 !docs/architecture.svg
+!docs/typesafe-judgment-opportunities.md

@@ -29,6 +29,7 @@ from .exceptions import (
     BrowserNotInstalledError,
     Neo4jConfigError,
     PlaywrightNotAvailableError,
+    TypeSafeConfigError,
 )
 from .preflight import PreflightError
 from .scraper import run_scraper
@@ -432,6 +433,9 @@ def _run_scrape_command(args: argparse.Namespace) -> None:
     except Neo4jConfigError:
         console.print("\n[red]Error: Neo4j configuration missing[/]")
         console.print("Set: [cyan]NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD[/]")
+        raise SystemExit(1) from None
+    except TypeSafeConfigError as e:
+        console.print(f"\n[red]Error: {e}[/]")
         raise SystemExit(1) from None
     except PreflightError:
         # Error details already printed by _run_preflight()

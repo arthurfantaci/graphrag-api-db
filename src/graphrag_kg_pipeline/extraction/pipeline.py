@@ -42,6 +42,7 @@ class KGPipelineConfig:
         neo4j_password: Neo4j password.
         neo4j_database: Neo4j database name.
         openai_api_key: OpenAI API key for LLM and embeddings.
+        typesafe_api_key: TypeSafe API key for System One judgments (industry consolidation).
         llm_model: LLM model name for extraction.
         embedding_model: Embedding model name.
         chunking_config: Hierarchical chunking configuration.
@@ -67,6 +68,9 @@ class KGPipelineConfig:
     voyage_api_key: str = ""
     voyage_model: str = "voyage-4"
 
+    # TypeSafe configuration (required for post-processing industry consolidation)
+    typesafe_api_key: str = ""
+
     # Chunking configuration
     chunking_config: HierarchicalChunkingConfig = field(default_factory=HierarchicalChunkingConfig)
 
@@ -91,6 +95,8 @@ class KGPipelineConfig:
         Reads from standard environment variables:
         - NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE
         - OPENAI_API_KEY
+        - VOYAGE_API_KEY (optional)
+        - TYPESAFE_API_KEY (checked at preflight and consolidation, not here)
 
         Returns:
             Configuration populated from environment.
@@ -110,6 +116,7 @@ class KGPipelineConfig:
         neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
         openai_api_key = os.getenv("OPENAI_API_KEY", "")
         voyage_api_key = os.getenv("VOYAGE_API_KEY", "")
+        typesafe_api_key = os.getenv("TYPESAFE_API_KEY", "")
 
         if not openai_api_key:
             msg = "OPENAI_API_KEY environment variable is required"
@@ -122,6 +129,7 @@ class KGPipelineConfig:
             neo4j_database=neo4j_database,
             openai_api_key=openai_api_key,
             voyage_api_key=voyage_api_key,
+            typesafe_api_key=typesafe_api_key,
         )
 
     def to_dict(self) -> dict[str, Any]:
